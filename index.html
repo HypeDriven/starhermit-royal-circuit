@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#141026">
+  <meta name="description" content="Royal Circuit — race four floats around a lantern-lit pavilion circuit. A festival race board game.">
+  <title>Royal Circuit</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='%23141026' stroke='%23e8b04b' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='5' fill='%23e8b04b'/%3E%3C/svg%3E">
+</head>
+<body>
+  <a class="skip-link" href="#action-tray">Skip to game controls</a>
+
+  <!-- Three.js canvas: never the only UI; every control has a DOM equivalent -->
+  <canvas id="gl" aria-hidden="true"></canvas>
+  <div id="gl-fallback" hidden role="alert">
+    <div class="panel">
+      <h2>3D unavailable</h2>
+      <p>Royal Circuit could not start WebGL on this device. Your progress is saved;
+      the full game board is still available in the accessible board panel.</p>
+      <button id="gl-fallback-continue" class="btn">Continue in 2D mode</button>
+    </div>
+  </div>
+
+  <div id="app" data-state="boot">
+
+    <!-- ======================= BOOT ======================= -->
+    <section id="screen-boot" class="screen active" aria-label="Loading">
+      <div class="boot-box">
+        <div class="logo-mark" aria-hidden="true">🏮</div>
+        <h1 class="game-title">Royal Circuit</h1>
+        <div class="progress" role="progressbar" aria-label="Loading" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="progress-fill" id="boot-fill"></div>
+        </div>
+        <p id="boot-status" class="muted">Lighting the lanterns…</p>
+      </div>
+    </section>
+
+    <!-- ======================= TITLE ======================= -->
+    <section id="screen-title" class="screen" aria-labelledby="title-h">
+      <div class="title-wrap">
+        <header class="title-head">
+          <div class="logo-mark big" aria-hidden="true">🏮</div>
+          <h1 id="title-h" class="game-title">Royal Circuit</h1>
+          <p class="tagline">Race your floats around the festival circuit. First to crown all four wins.</p>
+        </header>
+        <button id="btn-play" class="btn btn-play">▶ Play</button>
+        <nav class="title-grid" aria-label="Game modes">
+          <button class="mode-card" data-mode="daily" id="card-daily">
+            <span class="mode-icon" aria-hidden="true">🌇</span>
+            <span class="mode-name">Daily Circuit</span>
+            <span class="mode-sub" id="daily-sub">One shared race each day</span>
+          </button>
+          <button class="mode-card" data-mode="journey" id="card-journey">
+            <span class="mode-icon" aria-hidden="true">🗺️</span>
+            <span class="mode-name">Journey</span>
+            <span class="mode-sub" id="journey-sub">40 festival stages</span>
+          </button>
+          <button class="mode-card" data-mode="learn" id="card-learn">
+            <span class="mode-icon" aria-hidden="true">📜</span>
+            <span class="mode-name">Learn</span>
+            <span class="mode-sub">Interactive lessons</span>
+          </button>
+          <button class="mode-card" data-mode="practice" id="card-practice">
+            <span class="mode-icon" aria-hidden="true">🎋</span>
+            <span class="mode-name">Practice</span>
+            <span class="mode-sub">Unranked, undo allowed</span>
+          </button>
+          <button class="mode-card" data-mode="challenge" id="card-challenge">
+            <span class="mode-icon" aria-hidden="true">⚡</span>
+            <span class="mode-name">Challenges</span>
+            <span class="mode-sub">Constrained goals</span>
+          </button>
+          <button class="mode-card" data-mode="hosted" id="card-hosted">
+            <span class="mode-icon" aria-hidden="true">🏮</span>
+            <span class="mode-name">Hosted Play</span>
+            <span class="mode-sub" id="hosted-sub">Rooms with friends</span>
+          </button>
+        </nav>
+        <footer class="title-foot">
+          <button class="chip" id="chip-profile" aria-label="Profile"><span aria-hidden="true">🏮</span> <span id="profile-name">Guest Envoy</span></button>
+          <button class="chip" id="chip-achievements">Achievements</button>
+          <button class="chip" id="chip-leaderboards">Leaderboards</button>
+          <button class="chip" id="chip-help">How to Play</button>
+          <button class="chip" id="chip-settings">Settings</button>
+        </footer>
+      </div>
+    </section>
+
+    <!-- ======================= SETUP (all modes) ======================= -->
+    <section id="screen-setup" class="screen" aria-labelledby="setup-h">
+      <div class="panel setup-panel">
+        <h2 id="setup-h">Set up</h2>
+        <div id="setup-body"><!-- built per mode by ui.js --></div>
+        <div class="row end">
+          <button class="btn ghost" id="setup-back">Back</button>
+          <button class="btn primary" id="setup-start">Start</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= JOURNEY MAP ======================= -->
+    <section id="screen-journey" class="screen" aria-labelledby="journey-h">
+      <div class="panel wide">
+        <div class="row between">
+          <h2 id="journey-h">Journey</h2>
+          <button class="btn ghost" data-nav="title">Back</button>
+        </div>
+        <p class="muted" id="journey-progress-line"></p>
+        <div id="journey-grid" class="stage-grid" role="list"></div>
+      </div>
+    </section>
+
+    <!-- ======================= LEARN ======================= -->
+    <section id="screen-learn" class="screen" aria-labelledby="learn-h">
+      <div class="panel wide">
+        <div class="row between">
+          <h2 id="learn-h">Learn the Circuit</h2>
+          <button class="btn ghost" data-nav="title">Back</button>
+        </div>
+        <div id="lesson-list" class="card-list" role="list"></div>
+      </div>
+    </section>
+
+    <!-- ======================= CHALLENGES ======================= -->
+    <section id="screen-challenge" class="screen" aria-labelledby="ch-h">
+      <div class="panel wide">
+        <div class="row between">
+          <h2 id="ch-h">Challenges</h2>
+          <button class="btn ghost" data-nav="title">Back</button>
+        </div>
+        <div id="challenge-list" class="card-list" role="list"></div>
+      </div>
+    </section>
+
+    <!-- ======================= HOSTED LOBBY ======================= -->
+    <section id="screen-hosted" class="screen" aria-labelledby="hosted-h">
+      <div class="panel wide">
+        <div class="row between">
+          <h2 id="hosted-h">Hosted Play</h2>
+          <button class="btn ghost" data-nav="title">Back</button>
+        </div>
+        <div id="hosted-body"></div>
+      </div>
+    </section>
+
+    <!-- ======================= GAME HUD ======================= -->
+    <section id="screen-game" class="screen game" aria-label="Game">
+      <header id="hud-top" class="hud-top">
+        <div class="hud-objective">
+          <h2 id="hud-mode-name" class="hud-mode">Practice</h2>
+          <p id="hud-objective" class="hud-obj-text">Crown all four floats.</p>
+        </div>
+        <div id="hud-players" class="hud-players" role="list" aria-label="Players"></div>
+        <div class="hud-top-actions">
+          <button id="btn-board-state" class="icon-btn" aria-label="Board state (accessible text)" title="Board state">☰</button>
+          <button id="btn-pause" class="icon-btn" aria-label="Pause" title="Pause (Esc)">⏸</button>
+        </div>
+      </header>
+
+      <div id="turn-banner" class="turn-banner" role="status"></div>
+      <div id="caption-line" class="caption-line" aria-hidden="true"></div>
+
+      <!-- left rail: objective/progression (wide screens) -->
+      <aside id="rail-left" class="rail rail-left" aria-label="Objective and progress">
+        <h3>Objective</h3>
+        <p id="rail-objective">Crown all four floats to win.</p>
+        <h3>Progress</h3>
+        <ul id="rail-progress" class="progress-list"></ul>
+        <h3>Rules</h3>
+        <ul id="rail-rules" class="rules-list"></ul>
+      </aside>
+
+      <!-- right rail: contextual actions + status -->
+      <aside id="rail-right" class="rail rail-right" aria-label="Actions and status">
+        <h3>Turn</h3>
+        <p id="rail-turn" class="rail-turn">—</p>
+        <div id="rail-die" class="rail-die" aria-hidden="true">⚄</div>
+        <div id="rail-context"></div>
+      </aside>
+
+      <!-- bottom thumb-zone action tray -->
+      <div id="action-tray" class="action-tray" role="toolbar" aria-label="Turn actions">
+        <button id="btn-roll" class="btn btn-roll" aria-label="Roll the festival die">
+          <span class="die-face" id="die-face" aria-hidden="true">⚅</span>
+          <span id="roll-label">Roll</span>
+        </button>
+        <button id="btn-pass" class="btn" hidden>Pass</button>
+        <button id="btn-undo" class="btn ghost" hidden>Undo</button>
+        <button id="btn-hint" class="btn ghost">Hint</button>
+      </div>
+
+      <!-- float picker: DOM equivalent of canvas picking -->
+      <div id="float-picker" class="float-picker" role="group" aria-label="Choose a float" hidden></div>
+
+      <!-- lesson coach -->
+      <div id="lesson-coach" class="lesson-coach" role="status" hidden></div>
+    </section>
+  </div>
+
+  <!-- ======================= OVERLAYS ======================= -->
+  <div id="overlay-root">
+    <div id="overlay-pause" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="pause-h">
+      <div class="panel">
+        <h2 id="pause-h">Paused</h2>
+        <div class="col gap">
+          <button class="btn primary" id="btn-resume">Resume</button>
+          <button class="btn" id="btn-pause-settings">Settings</button>
+          <button class="btn" id="btn-pause-help">How to Play</button>
+          <button class="btn" id="btn-restart">Restart</button>
+          <button class="btn danger" id="btn-leave">Leave Game</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="overlay-settings" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="settings-h">
+      <div class="panel wide settings-panel">
+        <div class="row between">
+          <h2 id="settings-h">Settings</h2>
+          <button class="btn ghost" id="settings-close">Done</button>
+        </div>
+        <div class="tabs" role="tablist" aria-label="Settings sections">
+          <button role="tab" class="tab active" data-tab="audio" id="tab-audio">Audio</button>
+          <button role="tab" class="tab" data-tab="graphics" id="tab-graphics">Graphics</button>
+          <button role="tab" class="tab" data-tab="controls" id="tab-controls">Controls</button>
+          <button role="tab" class="tab" data-tab="access" id="tab-access">Accessibility</button>
+        </div>
+        <div id="settings-body" class="settings-body"></div>
+      </div>
+    </div>
+
+    <div id="overlay-results" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="results-h">
+      <div class="panel wide results-panel">
+        <h2 id="results-h">Results</h2>
+        <div id="results-body"></div>
+        <div class="row end wrap">
+          <button class="btn ghost" id="results-replay">Watch Replay</button>
+          <button class="btn" id="results-retry">Retry</button>
+          <button class="btn primary" id="results-next">Continue</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="overlay-help" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="help-h">
+      <div class="panel wide help-panel">
+        <div class="row between">
+          <h2 id="help-h">How to Play</h2>
+          <button class="btn ghost" id="help-close">Close</button>
+        </div>
+        <div id="help-body"></div>
+      </div>
+    </div>
+
+    <div id="overlay-achievements" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="ach-h">
+      <div class="panel wide">
+        <div class="row between">
+          <h2 id="ach-h">Achievements</h2>
+          <button class="btn ghost" id="ach-close">Close</button>
+        </div>
+        <div id="ach-body" class="card-list"></div>
+      </div>
+    </div>
+
+    <div id="overlay-boards" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="boards-h">
+      <div class="panel wide">
+        <div class="row between">
+          <h2 id="boards-h">Leaderboards</h2>
+          <button class="btn ghost" id="boards-close">Close</button>
+        </div>
+        <div class="tabs" role="tablist" aria-label="Leaderboards">
+          <button role="tab" class="tab active" data-board="daily">Daily</button>
+          <button role="tab" class="tab" data-board="best">All-time</button>
+        </div>
+        <div id="boards-body"></div>
+      </div>
+    </div>
+
+    <div id="overlay-profile" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="profile-h">
+      <div class="panel">
+        <div class="row between">
+          <h2 id="profile-h">Profile</h2>
+          <button class="btn ghost" id="profile-close">Close</button>
+        </div>
+        <div id="profile-body"></div>
+      </div>
+    </div>
+
+    <div id="overlay-boardstate" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="bs-h">
+      <div class="panel wide">
+        <div class="row between">
+          <h2 id="bs-h">Board State</h2>
+          <button class="btn ghost" id="bs-close">Close</button>
+        </div>
+        <div id="bs-body" class="board-mirror" tabindex="0"></div>
+      </div>
+    </div>
+
+    <div id="overlay-confirm" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="confirm-h">
+      <div class="panel">
+        <h2 id="confirm-h">Are you sure?</h2>
+        <p id="confirm-text"></p>
+        <div class="row end">
+          <button class="btn ghost" id="confirm-no">Cancel</button>
+          <button class="btn danger" id="confirm-yes">Confirm</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-root" aria-live="polite" aria-atomic="false"></div>
+
+  <!-- live regions: objective, turn, score, errors, results -->
+  <div class="visually-hidden" aria-live="polite" id="live-objective"></div>
+  <div class="visually-hidden" aria-live="polite" id="live-turn"></div>
+  <div class="visually-hidden" aria-live="polite" id="live-score"></div>
+  <div class="visually-hidden" aria-live="assertive" id="live-error"></div>
+  <div class="visually-hidden" aria-live="polite" id="live-results"></div>
+
+  <script type="module" src="src/bootstrap.js"></script>
+</body>
+</html>

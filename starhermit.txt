@@ -1,0 +1,3 @@
+name=Royal Circuit
+launch=index.html
+server=server.js

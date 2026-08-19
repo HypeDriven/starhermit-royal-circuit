@@ -1,0 +1,10 @@
+{
+  "name": "royal-circuit",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "test": "node tests/rules.test.mjs && node tests/content.test.mjs"
+  }
+}
