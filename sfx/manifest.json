@@ -1,0 +1,98 @@
+[
+  {
+    "name": "paper-tick",
+    "seconds": 1,
+    "prompt": "A soft single dry tick of a fingernail flicking a sheet of thick paper, close and very short.",
+    "event": "ui"
+  },
+  {
+    "name": "wooden-tok",
+    "seconds": 1,
+    "prompt": "One short warm knock of a small wooden game piece tapped once on a wooden board.",
+    "event": "select"
+  },
+  {
+    "name": "error-thud",
+    "seconds": 1,
+    "prompt": "A muted low thud of a soft mallet on a padded table, dull and gently discouraging.",
+    "event": "error"
+  },
+  {
+    "name": "die-rattle",
+    "seconds": 2,
+    "prompt": "A single wooden die rattling in a cupped hand, then landing, bouncing once and settling on a wooden board.",
+    "event": "roll"
+  },
+  {
+    "name": "wooden-steps",
+    "seconds": 1,
+    "prompt": "Three quick light hops of a small wooden pawn stepping across a wooden game board, evenly spaced.",
+    "event": "move"
+  },
+  {
+    "name": "match-chime",
+    "seconds": 2,
+    "prompt": "A match striking and flaring with a soft crackle, followed by a small warm brass chime.",
+    "event": "deploy"
+  },
+  {
+    "name": "taiko-hit",
+    "seconds": 2,
+    "prompt": "A single dramatic taiko festival drum strike with deep booming resonance and a sharp skin slap.",
+    "event": "capture"
+  },
+  {
+    "name": "bell-arpeggio",
+    "seconds": 2,
+    "prompt": "Four bright small temple bells rising in a quick cheerful arpeggio, shimmering festival tone.",
+    "event": "crown"
+  },
+  {
+    "name": "sparkle-rise",
+    "seconds": 2,
+    "prompt": "A rising magical sparkle shimmer of tiny bells sweeping upward, light and airy.",
+    "event": "encore"
+  },
+  {
+    "name": "fizzle-poof",
+    "seconds": 2,
+    "prompt": "A small flame fizzling out with a sad descending sigh and a soft poof of smoke.",
+    "event": "overkindled"
+  },
+  {
+    "name": "breath-whoosh",
+    "seconds": 1,
+    "prompt": "A soft gentle breathy whoosh of air passing through thin fabric.",
+    "event": "pass"
+  },
+  {
+    "name": "paper-slide",
+    "seconds": 1,
+    "prompt": "A sheet of paper sliding gently across a polished wooden table.",
+    "event": "turn"
+  },
+  {
+    "name": "festival-fanfare",
+    "seconds": 3,
+    "prompt": "A cheerful festival fanfare of bright plucked strings and small bells rising to a triumphant finish.",
+    "event": "win"
+  },
+  {
+    "name": "minor-cadence",
+    "seconds": 2,
+    "prompt": "A gentle sympathetic descending cadence of soft plucked strings, calm and warm, not punishing.",
+    "event": "lose"
+  },
+  {
+    "name": "soft-ping",
+    "seconds": 1,
+    "prompt": "A single soft high ping of a small crystal glass being tapped gently.",
+    "event": "hint"
+  },
+  {
+    "name": "reverse-slide",
+    "seconds": 1,
+    "prompt": "A reversed tape-like whoosh sliding upward, like a short sound being pulled backwards.",
+    "event": "undo"
+  }
+]

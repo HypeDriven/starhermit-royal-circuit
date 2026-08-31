@@ -3,7 +3,7 @@
  *
  * Three jobs:
  *   1. Static hosting of the client (index.html, styles.css, src/, vendor/,
- *      docs/, assets/) with traversal protection and sane cache headers.
+ *      docs/, assets/, sfx/) with traversal protection and sane cache headers.
  *   2. REST: GET /api/v1/time (clock sync), POST /api/v1/telemetry (drop).
  *   3. WebSocket /ws: hosted rooms whose game truth comes ONLY from
  *      src/rules.js running here on the server.
@@ -62,6 +62,7 @@ const MIME = {
   '.json': 'application/json; charset=utf-8',
   '.png': 'image/png',
   '.svg': 'image/svg+xml',
+  '.opus': 'audio/ogg',
   '.txt': 'text/plain; charset=utf-8',
   '.ico': 'image/x-icon',
 };
@@ -141,7 +142,7 @@ function serveStatic(req, res, pathname) {
     rel === 'index.html' ||
     rel === 'styles.css' ||
     rel === 'favicon.ico' ||
-    /^(src|vendor|docs|assets)\//.test(rel);
+    /^(src|vendor|docs|assets|sfx)\//.test(rel);
   if (!allowed) return sendJson(res, 404, { error: 'not-found' });
 
   fs.stat(abs, (err, st) => {

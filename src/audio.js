@@ -1,8 +1,11 @@
 /**
- * audio.js — procedural WebAudio engine (no assets, no external files).
+ * audio.js — procedural WebAudio engine with optional authored samples.
  *
  * Every sound is synthesized from oscillators, one shared noise buffer,
- * biquad filters and gain envelopes. The graph is:
+ * biquad filters and gain envelopes. If sfx/<name>.opus clips exist, each
+ * mapped event prefers its clip (lazy-fetched and decoded on first play);
+ * synthesis remains the fallback while clips load or are missing.
+ * * The graph is:
  *
  *   voice -> envelope/filter -> stem or bus gain -> master -> destination
  *
@@ -41,6 +44,32 @@ export const EVENT_CAPTIONS = {
 };
 
 const BUSES = ['music', 'effects', 'ambience', 'voice'];
+
+/**
+ * Optional authored one-shot samples (sfx/<basename>.opus), one per logical
+ * event. Clips are lazy-fetched and decoded after the user-gesture unlock,
+ * on the first play of their event. While a clip is loading — or if fetch/
+ * decode fails or the file simply isn't there — the procedural SFX below
+ * stays the fallback, so audio works with zero assets present.
+ */
+const EVENT_SAMPLES = {
+  ui: 'paper-tick',
+  select: 'wooden-tok',
+  error: 'error-thud',
+  roll: 'die-rattle',
+  move: 'wooden-steps',
+  deploy: 'match-chime',
+  capture: 'taiko-hit',
+  crown: 'bell-arpeggio',
+  encore: 'sparkle-rise',
+  overkindled: 'fizzle-poof',
+  pass: 'breath-whoosh',
+  turn: 'paper-slide',
+  win: 'festival-fanfare',
+  lose: 'minor-cadence',
+  hint: 'soft-ping',
+  undo: 'reverse-slide',
+};
 
 // ---------------------------------------------------------------------------
 // Music theory data (C major pentatonic, shared by every mood)
@@ -82,6 +111,7 @@ export function createAudio() {
   let tick = 0;                 // event counter feeding seeded variants
   const volumes = { music: 0.7, effects: 0.9, ambience: 0.6, voice: 0.8 };
   const live = new Set();       // { src, nodes } entries, for leak-free cleanup
+  const sampleCache = new Map(); // event -> AudioBuffer | 'loading' | 'failed'
 
   // Music state
   const stems = {};             // pad / pluck / drum / bell gain nodes
@@ -287,6 +317,33 @@ export function createAudio() {
       noiseHit(out, { t, attack: 0.1, decay: 0.18, gain: 0.045, freq: 500, freqEnd: 2600, q: 1.4 });
     },
   };
+
+  // -------------------------------------------------------------------------
+  // Authored samples — lazy fetch/decode/cache of sfx/<name>.opus per event
+  // -------------------------------------------------------------------------
+
+  /** Kick off a one-time fetch+decode for an event's clip. Never throws. */
+  function loadSample(name) {
+    if (sampleCache.has(name) || !ctx || typeof fetch !== 'function') return;
+    sampleCache.set(name, 'loading');
+    fetch('sfx/' + EVENT_SAMPLES[name] + '.opus')
+      .then((r) => {
+        if (!r.ok) throw new Error('sfx http ' + r.status);
+        return r.arrayBuffer();
+      })
+      .then((ab) => (ctx ? ctx.decodeAudioData(ab) : Promise.reject(new Error('ctx gone'))))
+      .then((buf) => sampleCache.set(name, buf))
+      .catch(() => sampleCache.set(name, 'failed')); // synthesis stays the fallback
+  }
+
+  /** Play a decoded clip once through the effects bus (inherits volume/mute). */
+  function playSample(buf) {
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(buses.effects);
+    src.start();
+    track(src, []);
+  }
 
   // -------------------------------------------------------------------------
   // Adaptive music — lookahead scheduler over layered stems
@@ -536,6 +593,15 @@ export function createAudio() {
     const fn = SFX[name];
     if (!fn) return;
     try {
+      if (name in EVENT_SAMPLES) {
+        const st = sampleCache.get(name);
+        if (st instanceof AudioBuffer) { // decoded: sample replaces synthesis
+          playSample(st);
+          return;
+        }
+        if (st === undefined) loadSample(name); // first play: start fetching
+        // 'loading' / 'failed' / just started: synthesis covers this play
+      }
       fn(ctx.currentTime + 0.02, opts || {}, variantStream(name), buses.effects);
     } catch (e) { /* audio must never crash the game */ }
   }
