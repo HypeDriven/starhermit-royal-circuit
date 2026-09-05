@@ -242,7 +242,13 @@ const STAGE_NAMES = [
 
 /** Deep-unfreeze helper: stages are stored frozen, sessions clone them. */
 export function stageRuleset(stage) {
-  return JSON.parse(JSON.stringify({ ...stage.ruleset, players: stage.players, seed: stage.seed }));
+  const rs = {
+    ...stage.ruleset,
+    players: stage.players ?? stage.ruleset.players,
+    seed: stage.seed,
+    ...(stage.goal ? { goal: { type: stage.goal.type, count: stage.goal.count ?? 1 } } : {}),
+  };
+  return JSON.parse(JSON.stringify(rs));
 }
 export const JOURNEY = Object.freeze(J);
 export function stageByIndex(n) { return JOURNEY[n - 1] || null; }

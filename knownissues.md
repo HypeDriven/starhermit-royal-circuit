@@ -10,7 +10,7 @@ running `server.js`.
 | --- | --- |
 | `npm test` | 249806 + 68 assertions pass, 0 failed (`rules.test.mjs`, `content.test.mjs`) |
 | `node --check` on all modules | clean (12 modules + `server.js`) |
-| `tests/e2e.mjs` (headless Chrome) | not present — replaced by an ad-hoc CDP boot/mode/crawl sweep (see below) |
+| `tests/e2e.mjs` (headless Chrome, desktop + mobile) | **E2E PASS** — real pointer tap on the Journey card, round finishes (crown-first, Victory), results shown, progress persisted, results Continue → next stage; no page errors |
 
 The unit suites are extensive but import only from `src/rules.js` and `src/content.js`
 (`tests/rules.test.mjs:5-9`, `tests/content.test.mjs:7-12`). `src/ui.js`, `src/session.js`,
@@ -25,45 +25,7 @@ matrix (`{"broken":`, `null`, `[]`, `{}`, non-JSON — all booted cleanly).
 
 Defects below were each verified by reading the source, not just reported by the model.
 
-### 1. The main "▶ Play" button is broken — `segField` crashes on numeric options
-
-- **File:** `src/ui.js:308` (`segField`), reached from `src/ui.js:390`, `391`, `392`, `403` and
-  `1634`
-- **Trigger:** Click "▶ Play" on the title screen (or the Practice mode card, or Local Table
-  setup, or Hosted Play → Create a room).
-- **Behaviour:** `segField` assumes every option is a string:
-
-  ```js
-  const b = el('button', { text: opt === 'cvd' ? 'CVD-safe' : opt[0].toUpperCase() + opt.slice(1), … });
-  ```
-
-  Five call sites pass numbers — `[2, 3, 4]` for Players / Floats / Seats and
-  `AI_LEVELS.map((l) => l.level)` (which is `[1, 2, 3]`, `src/ai.js:20-24`). For a number,
-  `opt[0]` is `undefined` and `.toUpperCase()` throws. The exception propagates out of
-  `showSetup`, so the rest of the setup screen — including `cfg.floats`, the rule-variant
-  checkboxes, the summary card and the Start button wiring — never runs. The player is left on an
-  **empty setup screen** whose Start button does nothing.
-- **Expected:** The Practice/Local setup renders its option groups; `#btn-play` at `src/ui.js:1816`
-  (`showSetup('practice')`) is the primary entry point into the game.
-- **Evidence:** Headless Chrome, clicking `#btn-play` on a clean load:
-
-  ```
-  STEP clickPlay: "ok"
-  STEP setupBody: 0            <- #setup-body has no children
-  STEP setupHeading: "Practice Match"
-  STEP clickStart: "clicked"
-  STEP screenVisible: ["screen-setup"]   <- still on setup; nothing started
-  --- console errors (1) ---
-  EXCEPTION: TypeError: Cannot read properties of undefined (reading 'toUpperCase')
-      at segField (…/src/ui.js:308:72)
-      at showSetup (…/src/ui.js:390:17)
-      at HTMLButtonElement.<anonymous> (…/src/ui.js:1816:76)
-  ```
-
-  The random UI crawl independently reproduced it from both `btn-play` and `card-practice`, and
-  `renderHostedHome` (`src/ui.js:1634`) throws the same way.
-
-### 2. Hosted play broadcasts the RNG state — any client can predict every die roll
+### 1. Hosted play broadcasts the RNG state — any client can predict every die roll
 
 - **File:** `server.js:710` (`handleStart`) and `server.js:403` (`commitResult`); state shape at
   `src/rules.js:103-110`; stream format at `src/rng.js:22-25`
@@ -96,7 +58,7 @@ Defects below were each verified by reading the source, not just reported by the
   events: [{"t":"roll","seat":0,"value":4}]
   ```
 
-### 3. There are no leaderboards at all, but the UI claims submissions are validated
+### 2. There are no leaderboards at all, but the UI claims submissions are validated
 
 - **File:** `src/ui.js:601-607` (`showBoards`), `src/save.js:24`, route table at
   `server.js:97-117`
@@ -119,6 +81,42 @@ Defects below were each verified by reading the source, not just reported by the
 - **Evidence:** The quoted string, `grep -n "leaderboard\|/api" server.js` (only `/time` and
   `/telemetry`), and `grep -n "leaderboard\|board\|friends" src/platform.js src/save.js` returning
   only the local-array declaration.
+
+## Resolved
+
+The defects below were confirmed in the current source and have been fixed (with the real
+pointer/touch + keyboard playability verified by `tests/e2e.mjs`).
+
+### 1. The main "▶ Play" button was broken — `segField` crashes on numeric options
+
+- **RESOLVED 2026-09-04.** `src/ui.js:303-319` `segField` now formats a non-string option with
+  `String(opt)` (numeric option labels like `[2, 3, 4]` and `AI_LEVELS.map(l=>l.level)` no longer
+  index a `Number` with `opt[0].toUpperCase()`). The Practice / Local / Hosted setup groups render
+  and Start buttons wire up. Verified: all challenges + journey stages create a game via
+  `createGame`, and the e2e drives a full round.
+  (This also covered the e2e-reported crash on numeric option arrays.)
+
+### 2. `#gl-fallback` overlay always covered the viewport and blocked every pointer/touch
+
+- **RESOLVED 2026-09-04.** `styles.css:30` added `#gl-fallback[hidden] { display: none; }`, so the
+  overlay honours its HTML `hidden` attribute and only shows when WebGL is genuinely unavailable.
+  A real pointer tap on the Journey card now reaches the UI (`tests/e2e.mjs` desktop pass), and the
+  game is playable by pointer AND keyboard.
+
+### 3. Challenge setup crashed on Start (players mismatch)
+
+- **RESOLVED 2026-09-04.** `src/content.js:244-252` `stageRuleset` now falls back to
+  `stage.ruleset.players` when a content definition has no top-level `players` (challenges only
+  carry `ruleset.players`), so `createGame` receives a player count matching the 2/3/4-player
+  array built from `def.ai` instead of defaulting to 4. Verified: all six challenges create a game.
+
+### 4. Journey "crown-first" objective was UI-only — round only ended on a full crown-sweep
+
+- **RESOLVED 2026-09-04.** `src/rules.js` (`normalizeRuleset` + `checkTerminal`) now recognises a
+  `{ type: 'crown-first', count }` ruleset goal and ends the round as soon as a player crowns the
+  goal count (reason `crown-first`), instead of only terminating on a full crown-sweep or turn
+  limit. `src/content.js` `stageRuleset` threads the stage `goal` into the ruleset. Verified: the
+  e2e Journey stage 1 round now finishes (Victory in 44 turns) instead of never terminating.
 
 ## Suspected — not confirmed
 
@@ -145,10 +143,10 @@ gap, since spec.md §Achievements and leaderboards asks for them independently o
 
 ## Checked, no defects found
 
-- WebGL: `canvas.getContext('webgl2')` succeeds under headless SwiftShader, `#gl-fallback`
-  stays hidden and `body.no-gl` is never set, so the 3-D board is the path actually exercised.
-  (The fallback markup is present in `index.html` and therefore shows up in `textContent`
-  dumps even while hidden — that is not evidence of a fallback.)
+- WebGL: `canvas.getContext('webgl2')` succeeds under headless SwiftShader and `body.no-gl` is
+  never set, so the 3-D board is the path actually exercised. **NB:** the earlier claim that
+  `#gl-fallback` "stays hidden" was WRONG — its `display: grid` overrode the `hidden` attribute
+  and the overlay always covered the viewport. That is fixed (see Resolved #2).
 - Suspend/resume: entered a round, performed an action, reloaded the page, and confirmed the
   game re-boots with its snapshot intact and no console errors or failed requests.
 - `src/rules.js` + `src/session.js` + `src/ai.js`: roll/move/pass/resign legality, exact-finish,
@@ -170,7 +168,6 @@ gap, since spec.md §Achievements and leaderboards asks for them independently o
 
 ## Not tested
 
-- Any Practice, Local Table or Hosted-create flow past the setup screen — blocked by defect 1.
 - `src/render.js` visual output; see the suspected item above.
 - Hosted play with 3-4 seats, reconnect via `seatToken`, and the abandon/auto-resign timers.
-- Touch and gamepad input.
+- Gamepad input.

@@ -65,6 +65,11 @@ export function normalizeRuleset(opts = {}) {
     maxTurns: Math.max(0, opts.maxTurns | 0), // rounds per player; 0 = unlimited
     seed: (opts.seed ?? 1) >>> 0,
   };
+  // Optional early-finish goal: a player who first crowns `count` floats wins
+  // immediately (used by journey "Be first to crown N float(s)" stages).
+  if (opts.goal && opts.goal.type === 'crown-first') {
+    rs.goal = { type: 'crown-first', count: Math.max(1, opts.goal.count | 0) };
+  }
   if (Array.isArray(opts.forcedRolls)) {
     if (!opts.forcedRolls.every((v) => Number.isInteger(v) && v >= 1 && v <= 6)) {
       throw new Error('forcedRolls must be die faces 1..6');
@@ -437,6 +442,18 @@ function endTurn(state, events, why) {
 }
 
 function checkTerminal(state, events) {
+  // Early-finish goal: a player who is first to crown `count` floats wins.
+  // (Journey "Be first to crown N float(s)" stages end as soon as the goal
+  // is reached, rather than waiting for a full crown-sweep.)
+  const goal = state.ruleset.goal;
+  if (goal && goal.type === 'crown-first') {
+    for (const pl of state.players) {
+      if (!pl.resigned && pl.crowned >= goal.count) {
+        finish(state, pl.seat, 'crown-first', events);
+        return true;
+      }
+    }
+  }
   // Crown sweep: a player crowned every float.
   for (const pl of state.players) {
     if (!pl.resigned && pl.floats.every((p) => p === DONE)) {

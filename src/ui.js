@@ -305,7 +305,10 @@ function segField(label, options, current, onChange, hint) {
   wrap.append(el('div', { class: 'field-label', text: label }));
   const seg = el('div', { class: 'seg', role: 'group', 'aria-label': label });
   for (const opt of options) {
-    const b = el('button', { text: opt === 'cvd' ? 'CVD-safe' : opt[0].toUpperCase() + opt.slice(1), 'aria-pressed': String(opt === current) });
+    const label = typeof opt === 'number' ? String(opt)
+      : opt === 'cvd' ? 'CVD-safe'
+      : opt[0].toUpperCase() + opt.slice(1);
+    const b = el('button', { text: label, 'aria-pressed': String(opt === current) });
     b.addEventListener('click', () => {
       seg.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', 'false'));
       b.setAttribute('aria-pressed', 'true');
