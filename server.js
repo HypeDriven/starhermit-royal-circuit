@@ -142,6 +142,8 @@ function serveStatic(req, res, pathname) {
     rel === 'index.html' ||
     rel === 'styles.css' ||
     rel === 'favicon.ico' ||
+    rel === 'favicon.svg' ||
+    rel === 'icon.png' ||
     /^(src|vendor|docs|assets|sfx)\//.test(rel);
   if (!allowed) return sendJson(res, 404, { error: 'not-found' });
 
@@ -367,6 +369,22 @@ function publicRoom(room) {
   };
 }
 
+/**
+ * Client-visible view of authoritative state.
+ *
+ * TRUST: `state.rng` is a mulberry32 stream state and `ruleset.seed` seeds it,
+ * so shipping either lets a client compute every future die roll before it
+ * decides a move. Both are redacted here; clients never apply commands in
+ * hosted play (the server is the only writer), so nothing they render or
+ * evaluate — legal actions, hints, scores — needs the stream.
+ */
+function publicState(state) {
+  if (!state) return state;
+  const { rng, ruleset, ...rest } = state;
+  const { seed, ...publicRuleset } = ruleset || {};
+  return { ...rest, ruleset: publicRuleset };
+}
+
 function broadcast(room, obj) {
   for (const p of room.players) {
     if (p && p.conn && !p.conn.dead) sendMsg(p.conn, obj);
@@ -401,7 +419,7 @@ function commitResult(room, res, commandId) {
   room.eventLog.push({ tick: res.state.tick, commandId, events: res.events });
   if (room.eventLog.length > EVENT_LOG_CAP) room.eventLog.shift();
   room.lastResult = { commandId, tick: res.state.tick, events: res.events };
-  broadcast(room, { t: 'applied', snapshot: res.state, events: res.events });
+  broadcast(room, { t: 'applied', snapshot: publicState(res.state), events: res.events });
   markSeen(room);
   if (res.state.phase === 'over') finishRoom(room);
 }
@@ -627,7 +645,7 @@ function handleJoin(conn, msg, replyTo) {
       replyTo,
     };
     if (room.state) {
-      reply.snapshot = room.state;
+      reply.snapshot = publicState(room.state);
       reply.away = { fromTick: p.lastSeenTick, events: eventsSince(room, p.lastSeenTick) };
       p.lastSeenTick = room.state.tick;
       if (room.results) reply.results = room.results;
@@ -646,7 +664,7 @@ function handleJoin(conn, msg, replyTo) {
         t: 'room',
         room: publicRoom(room),
         you: { seat: null, seatToken: null },
-        snapshot: room.state,
+        snapshot: publicState(room.state),
         results: room.results,
         replyTo,
       });
@@ -708,7 +726,7 @@ function handleStart(conn, msg, replyTo) {
   room.started = true;
   room.eventLog = [];
   room.lastResult = null;
-  broadcast(room, { t: 'begin', snapshot: room.state });
+  broadcast(room, { t: 'begin', snapshot: publicState(room.state) });
   markSeen(room);
   log(`[room ${room.code}] game started (seed ${seed})`);
 }
@@ -728,13 +746,13 @@ function handleCommand(conn, msg, replyTo) {
     return sendMsg(conn, { t: 'rejected', error: 'not-your-turn', replyTo });
   }
   if (cmd.tick !== st.tick) {
-    return sendMsg(conn, { t: 'rejected', error: 'stale-tick', snapshot: st, replyTo });
+    return sendMsg(conn, { t: 'rejected', error: 'stale-tick', snapshot: publicState(st), replyTo });
   }
   const res = applyCommand(st, cmd);
   if (res.duplicate) {
     // Idempotent redelivery: same answer, no broadcast, no log append.
     const events = room.lastResult && room.lastResult.commandId === cmd.id ? room.lastResult.events : [];
-    return sendMsg(conn, { t: 'applied', snapshot: room.state, events, duplicate: true, replyTo });
+    return sendMsg(conn, { t: 'applied', snapshot: publicState(room.state), events, duplicate: true, replyTo });
   }
   if (!res.ok) {
     // TRUST: rejected commands are discarded — the returned state (which only

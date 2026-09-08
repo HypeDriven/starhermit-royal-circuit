@@ -203,6 +203,7 @@ No module may mutate rules state except through a validated command. Rendering c
 - Declare a small static achievement set: first completion, mechanic mastery, a sustained streak, a difficult content milestone, and an accessibility-neutral long-term goal. Keys are stable, lowercase identifiers; unlocks are idempotent.
 - Provide global and friends-filtered boards for the primary metric plus a fair daily/weekly board. Include ruleset, content version, seed, assists, and duration with every submission; reject impossible or stale-version scores.
 - Competitive outcomes, rating changes, and achievement unlocks are server-authoritative. Never accept a client-supplied winner, score, hidden state, or elapsed time as truth.
+- Until authoritative board submission exists, records are kept on the player's own device and the boards screen must say so and present them as casual. Never claim validation the build does not perform.
 
 ### Sessions and transport
 - Use the shared Games API for invitations, nearest-rating matchmaking where competitive, practice sessions against deterministic AI where suitable, session summaries, deadlines, move submission, and replays.

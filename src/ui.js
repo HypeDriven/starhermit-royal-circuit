@@ -124,6 +124,9 @@ function hideOverlay(name) {
   $(`#overlay-${name}`).hidden = true;
   if (name === 'confirm' && confirmResolve) { const r = confirmResolve; confirmResolve = null; r(false); }
   restoreFocus();
+  // Dismissing the pause panel (Escape) must also leave the paused state,
+  // otherwise the match is frozen with no visible way back.
+  if (name === 'pause' && app.state === AppState.PAUSED) resumeGame();
 }
 
 function hideAllOverlays() { OVERLAYS.forEach((n) => { $(`#overlay-${n}`).hidden = true; }); }
@@ -357,9 +360,18 @@ function showTitle() {
 
 function resumeSnapshot(snap) {
   try {
-    app.session = Session.restore(snap, onSessionEvent);
+    const def = snap.contentId ? findContent(snap.contentId) : null;
+    // A restored lesson needs app.lesson (enterGameScreen reads its title) and
+    // a restored stage needs session.content, or its goal/records are lost.
+    app.lesson = snap.mode === 'learn' ? def : null;
+    app.content = snap.mode === 'learn' ? null : def;
+    app.session = Session.restore(snap, onSessionEvent, { content: app.content, lesson: app.lesson });
     app.mode = snap.mode;
-    app.content = snap.contentId ? findContent(snap.contentId) : null;
+    app.lastGameOpts = { mode: snap.mode, ruleset: snap.state.ruleset, seed: snap.envelope.seed,
+      players: snap.state.players.map(p => ({ name: p.name, kind: p.kind, level: p.level })),
+      ranked: snap.ranked, undoAllowed: snap.undoAllowed, content: app.content, lesson: app.lesson };
+    app.capturedThisGame = 0;
+    app.replayMode = false;
     setState(AppState.ACTIVE, 'resume-snapshot');
     enterGameScreen();
     syncAll();
@@ -580,7 +592,11 @@ function showAchievements() {
 }
 
 function showBoards(board = 'daily') {
-  $$('#overlay-boards .tab').forEach((t) => t.classList.toggle('active', t.dataset.board === board));
+  $$('#overlay-boards .tab').forEach((t) => {
+    const on = t.dataset.board === board;
+    t.classList.toggle('active', on);
+    t.setAttribute('aria-selected', String(on));
+  });
   const body = $('#boards-body');
   body.innerHTML = '';
   const rows = app.save.leaderboards[board === 'daily' ? 'daily' : 'best'];
@@ -606,7 +622,7 @@ function showBoards(board = 'daily') {
     });
     table.append(tb);
     body.append(table);
-    body.append(el('p', { class: 'hint', text: 'Submissions include ruleset, content version, seed and duration; impossible or stale-version scores are rejected.' }));
+    body.append(el('p', { class: 'hint', text: 'Casual board — these records are stored on this device only and are not submitted or compared against other players. Each row keeps its ruleset, content version, seed and duration; impossible scores are rejected before they are recorded.' }));
   }
   showOverlay('boards');
 }
@@ -686,9 +702,10 @@ function unlock(key) {
 function updateProgression(results) {
   const s = app.save;
   const st = s.stats;
+  const mySeat = app.mode === 'hosted' ? (app.hosted?.seat ?? 0) : 0;
   st.gamesPlayed += 1;
-  const me = results.rows.find((r) => r.seat === 0);
-  const won = results.winner === 0;
+  const me = results.rows.find((r) => r.seat === mySeat);
+  const won = results.winner === mySeat;
   if (won) st.gamesWon += 1;
   st.captures += me?.captures ?? 0;
   st.crowned += me?.crowned ?? 0;
@@ -732,17 +749,17 @@ function updateProgression(results) {
       st.lastDaily = key;
       if (st.streakDays >= 3) unlock('daily_streak_3');
     }
-    pushBoard('daily', results, me);
+    pushBoard('daily', results, me, mySeat);
   }
   if ((results.mode === 'challenge' || results.mode === 'journey' || results.mode === 'daily')) {
-    pushBoard('best', results, me);
+    pushBoard('best', results, me, mySeat);
   }
   storeSave(s);
 }
 
-function pushBoard(board, results, me) {
+function pushBoard(board, results, me, mySeat = 0) {
   const entry = {
-    contentId: results.contentId, won: results.winner === 0,
+    contentId: results.contentId, won: results.winner === mySeat,
     score: me?.breakdown.total ?? 0, turns: results.turns,
     seed: results.seed, durationMs: results.elapsedMs,
     ruleset: app.session?.state.ruleset, version: 1, at: new Date().toISOString(),
@@ -762,6 +779,7 @@ let animChain = Promise.resolve();
 function startGame(opts) {
   clearSnapshot();
   app.lastGameOpts = opts;
+  app.session?.cancelPending();
   app.session = new Session({ ...opts, onEvent: onSessionEvent });
   app.capturedThisGame = 0;
   app.lessonStepIdx = 0;
@@ -842,9 +860,10 @@ function onSessionEvent(events, state) {
   app._lastEvents = events;
   for (const e of events) {
     const sfx = { roll: 'roll', move: 'move', deploy: 'deploy', capture: 'capture', crown: 'crown', encore: 'encore', overkindled: 'overkindled', pass: 'pass', turn: 'turn', resign: 'lose', gameover: null, undo: 'undo' }[e.t];
-    if (e.t === 'gameover') sfxPlay(state.winner === 0 || app.mode === 'hosted' && state.winner === app.hosted?.seat ? 'win' : 'lose');
+    const mySeat = app.mode === 'hosted' ? (app.hosted?.seat ?? 0) : 0;
+    if (e.t === 'gameover') sfxPlay(state.winner === mySeat ? 'win' : 'lose');
     else if (sfx) sfxPlay(sfx);
-    if (e.t === 'capture' && e.seat === 0) app.capturedThisGame += 1;
+    if (e.t === 'capture' && e.seat === mySeat) app.capturedThisGame += 1;
     if (e.t === 'capture') haptic(30);
     if (e.t === 'roll') $('#die-face').textContent = DIE_GLYPHS[e.value - 1];
   }
@@ -915,12 +934,16 @@ function updateFlow() {
   if (!isHuman && !app.replayMode) driveAIOnce();
 }
 
-let aiDriving = false;
+const aiDriving = new WeakSet();
 function driveAIOnce() {
-  if (aiDriving) return;
-  aiDriving = true;
+  const session = app.session;
+  if (!session || aiDriving.has(session) || app.state !== AppState.ACTIVE) return;
+  aiDriving.add(session);
   const pace = app.settings.accessibility.timingAssist ? 1100 : 650;
-  app.session.driveAI(pace).finally(() => { aiDriving = false; });
+  session.driveAI(pace).finally(() => {
+    aiDriving.delete(session);
+    if (app.session === session && app.state === AppState.ACTIVE && !session.isOver && !session.paused && session.currentPlayer.kind === 'ai') driveAIOnce();
+  });
 }
 
 /* ----- float picker: DOM buttons aligned to projected 3D targets ----- */
@@ -1160,7 +1183,12 @@ function showResults(lessonOnly = false) {
   const s = app.session;
   const results = s.results();
   const before = new Set(Object.keys(app.save.achievements));
-  if (!app.replayMode) updateProgression(results);
+  // Once per match: watching a replay returns here with the real session, and
+  // a second call would double-count stats, achievements and board entries.
+  if (!app.replayMode && !s.progressionApplied) {
+    s.progressionApplied = true;
+    updateProgression(results);
+  }
   const newAch = Object.keys(app.save.achievements).filter((k) => !before.has(k));
 
   const body = $('#results-body');
@@ -1178,6 +1206,7 @@ function showResults(lessonOnly = false) {
   }));
   const sub = {
     'crown-sweep': `${results.rows.find((r) => r.seat === results.winner)?.name ?? ''} crowned every float.`,
+    'crown-first': `${results.rows.find((r) => r.seat === results.winner)?.name ?? ''} reached the crown target first.`,
     'turn-limit': 'The turn limit was reached.',
     resign: 'A player resigned.', abandon: 'A player abandoned the match.',
   }[results.reason];
@@ -1334,6 +1363,7 @@ function pauseGame(reason = 'user') {
   if (!app.session || app.session.isOver) return;
   if (app.state !== AppState.ACTIVE && app.state !== AppState.RESOLVING) return;
   app.session.paused = true;
+  app.session.cancelPending(); // drop the AI turn scheduled for right now
   setState(AppState.PAUSED, reason);
   app.renderer?.clearHints();
   showOverlay('pause');
@@ -1341,7 +1371,8 @@ function pauseGame(reason = 'user') {
 }
 
 function resumeGame() {
-  hideOverlay('pause');
+  $('#overlay-pause').hidden = true; // direct: hideOverlay routes back here
+  restoreFocus();
   if (!app.session) return;
   app.session.paused = false;
   setState(AppState.ACTIVE, 'resume');
@@ -1350,7 +1381,7 @@ function resumeGame() {
 
 async function restartGame() {
   if (app.mode === 'hosted' || !app.lastGameOpts) return;
-  hideOverlay('pause');
+  $('#overlay-pause').hidden = true; // stay paused while the prompt is open
   if (await confirmDialog('Restart this match from the beginning?')) {
     startGame({ ...app.lastGameOpts });
   } else {
@@ -1359,7 +1390,7 @@ async function restartGame() {
 }
 
 async function leaveGame() {
-  hideOverlay('pause');
+  $('#overlay-pause').hidden = true; // stay paused while the prompt is open
   if (app.mode === 'hosted') {
     if (await confirmDialog('Leave the room? Your seat is held for a reconnect while the room lives.')) {
       if (app.hosted?.code) app.platform.leaveRoom(app.hosted.code);
@@ -1810,7 +1841,11 @@ function bindPlatform() {
 /* DOM wiring                                                           */
 /* ------------------------------------------------------------------ */
 function openSettings(tab = 'audio') {
-  $$('#overlay-settings .tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === tab));
+  $$('#overlay-settings .tab').forEach((t) => {
+    const on = t.dataset.tab === tab;
+    t.classList.toggle('active', on);
+    t.setAttribute('aria-selected', String(on));
+  });
   buildSettingsBody(tab);
   showOverlay('settings');
 }
@@ -1854,7 +1889,10 @@ function bindOverlays() {
 
   $$('#overlay-settings .tab').forEach((t) => {
     t.addEventListener('click', () => {
-      $$('#overlay-settings .tab').forEach((x) => x.classList.toggle('active', x === t));
+      $$('#overlay-settings .tab').forEach((x) => {
+        x.classList.toggle('active', x === t);
+        x.setAttribute('aria-selected', String(x === t));
+      });
       buildSettingsBody(t.dataset.tab);
     });
   });

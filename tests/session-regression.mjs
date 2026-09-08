@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import { Session } from '../src/session.js';
+const session = new Session({mode:'practice',ruleset:{players:2},seed:42,players:[{name:'AI',kind:'ai',level:2},{name:'Human',kind:'human'}]});
+const tick = session.state.tick;
+const driving = session.driveAI(1000);
+session.paused = true;
+session.cancelPending();
+await driving;
+assert.equal(session.state.tick,tick,'cancelled paced turn must not mutate state');
+session.paused = false;
+await session.driveAI(0);
+assert.ok(session.state.tick > tick,'resume must drive AI after cancellation');
+const content = {id:'test-stage'};
+const restored = Session.restore({mode:session.mode,state:session.state,envelope:session.envelope,startedAt:session.startedAt,undoAllowed:true,ranked:false},()=>{},{content});
+assert.equal(restored.content,content);
+assert.deepEqual(restored.state,session.state);
+console.log('Session cancellation, resume and restored content checks passed');

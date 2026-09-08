@@ -15,72 +15,34 @@ running `server.js`.
 The unit suites are extensive but import only from `src/rules.js` and `src/content.js`
 (`tests/rules.test.mjs:5-9`, `tests/content.test.mjs:7-12`). `src/ui.js`, `src/session.js`,
 `src/ai.js`, `src/save.js`, `src/platform.js` and `server.js` have no automated coverage at all —
-and `src/ui.js` is where the most serious defect below lives.
+and `src/ui.js` is where the most serious defect below lived.
 
 Ad-hoc headless-Chrome coverage: boot, every title mode card, a Daily Circuit round started and
 driven through hint/pause/resume, a 70-click random UI crawl, and a corrupt-`localStorage` reload
 matrix (`{"broken":`, `null`, `[]`, `{}`, non-JSON — all booted cleanly).
 
+### Review pass 2026-09-07
+
+| Check | Result |
+| --- | --- |
+| `npm test` | 249806 + 68 assertions pass, 0 failed (re-run after the fixes) |
+| `node --check` on all modules + tests | clean |
+| `tests/e2e.mjs` (headless Chrome, desktop + mobile) | **E2E PASS**, no page errors |
+| Hosted WebSocket probe (2 clients, real protocol) | no `rng` / `ruleset.seed` in any client snapshot; roll still applies and broadcasts |
+| Two-browser hosted round against `server.js` | create → join → start → roll visible on both clients, zero console errors |
+| Browser smoke (practice: pause → Escape → play on, 6 turns, reload → resume) | pass, zero console errors, zero failed requests |
+
+Still without automated coverage: `src/ui.js`, `src/session.js`, `src/ai.js`, `src/save.js`,
+`src/platform.js`, `server.js` (all exercised only through the e2e/smoke runs above).
+
+**Not implemented:** UI text is English only. `agents/localization.md` asks for US/UK English,
+es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR and it-IT; no string table or locale switch exists yet,
+and adding one touches every screen in `src/ui.js`.
+
 ## Confirmed defects
 
-Defects below were each verified by reading the source, not just reported by the model.
-
-### 1. Hosted play broadcasts the RNG state — any client can predict every die roll
-
-- **File:** `server.js:710` (`handleStart`) and `server.js:403` (`commitResult`); state shape at
-  `src/rules.js:103-110`; stream format at `src/rng.js:22-25`
-- **Trigger:** Join any hosted room and read the `begin` / `applied` snapshot.
-- **Behaviour:** The server comments at `server.js:702` that "TRUST: the seed is generated here;
-  clients never see it before the fact", then broadcasts the entire authoritative state verbatim:
-
-  ```js
-  broadcast(room, { t: 'begin', snapshot: room.state });          // server.js:710
-  broadcast(room, { t: 'applied', snapshot: res.state, events: res.events }); // server.js:403
-  ```
-
-  `room.state` contains `ruleset` (with `seed`) and `rng`, and `createStream` returns a plain
-  `{ s: uint32 }` object that survives `JSON.stringify` (`src/rng.js:22-25`). mulberry32 is
-  trivially forward-computable, so a client knows every future roll before deciding its move.
-- **Expected:** Snapshots must redact `rng` and `ruleset.seed` (the sibling game `river-stakes`
-  attempts exactly this in its `getSnapshot`), or the dice must be committed server-side.
-  Note this is a protocol-level defect independent of defect 1: the leak is in what the server
-  sends, so fixing the broken "Create a room" form would expose it to real players immediately.
-- **Evidence:** Two live WebSocket clients against the running server (port 39508), speaking the
-  documented protocol directly:
-
-  ```
-  snapshot keys: version,ruleset,rng,forcedRollIdx,tick,turnIndex,round,turnsPlayed,
-                 phase,die,sixes,players,winner,reason,lastCommandId
-  ruleset.seed leaked to clients: 3660380090
-  rng stream state leaked to clients: {"s":3660380090}
-  predicted next die: 4
-  actual die after roll: 4
-  events: [{"t":"roll","seat":0,"value":4}]
-  ```
-
-### 2. There are no leaderboards at all, but the UI claims submissions are validated
-
-- **File:** `src/ui.js:601-607` (`showBoards`), `src/save.js:24`, route table at
-  `server.js:97-117`
-- **Trigger:** Open the Leaderboards overlay.
-- **Behaviour:** The overlay reads `app.save.leaderboards[…]` — a purely local array
-  (`src/save.js:24`, commented "local boards; hosted boards come from the server") — and then
-  prints:
-
-  ```js
-  'Submissions include ruleset, content version, seed and duration; impossible or stale-version scores are rejected.'
-  ```
-
-  Nothing is ever submitted anywhere: `server.js` serves only `GET /api/v1/time` and
-  `POST /api/v1/telemetry` before 404ing every other `/api/` path, and `src/platform.js` contains
-  no board or achievement call. The claim in the UI is false.
-- **Expected:** spec.md §Achievements and leaderboards — "Provide global and friends-filtered
-  boards for the primary metric plus a fair daily/weekly board… For globally competitive boards,
-  validate score claims through a lightweight authoritative script… If validation is unavailable,
-  label the board casual."
-- **Evidence:** The quoted string, `grep -n "leaderboard\|/api" server.js` (only `/time` and
-  `/telemetry`), and `grep -n "leaderboard\|board\|friends" src/platform.js src/save.js` returning
-  only the local-array declaration.
+None outstanding. The two defects recorded by the 2026-08-20 pass were fixed on 2026-09-07;
+see Resolved #5 and #6.
 
 ## Resolved
 
@@ -117,6 +79,70 @@ pointer/touch + keyboard playability verified by `tests/e2e.mjs`).
   goal count (reason `crown-first`), instead of only terminating on a full crown-sweep or turn
   limit. `src/content.js` `stageRuleset` threads the stage `goal` into the ruleset. Verified: the
   e2e Journey stage 1 round now finishes (Victory in 44 turns) instead of never terminating.
+
+### 5. Hosted play broadcast the RNG state — any client could predict every die roll
+
+- **RESOLVED 2026-09-07.** `server.js` now builds every client-visible snapshot through
+  `publicState()`, which strips `state.rng` and `ruleset.seed` before `begin`, `applied`,
+  `rejected` (stale-tick resync), reconnect `room` replies and spectator joins. The client
+  never applies commands in hosted play, and nothing it renders or evaluates (legal actions,
+  hints, ranking, score breakdown) reads the stream, so the redaction is behaviour-neutral.
+  Verified with two live WebSocket clients against a running server: `has rng: false`,
+  `has ruleset.seed: false` on both `begin` and `applied`, and a roll still applied and
+  broadcast normally; and with a two-browser hosted round (create → join → start → roll
+  visible on both clients, zero console errors).
+
+### 6. The Leaderboards overlay claimed submissions were validated
+
+- **RESOLVED 2026-09-07.** `src/ui.js` `showBoards` now states the truth: the records are stored
+  on this device only, are not submitted or compared against other players, and the board is
+  labelled casual — matching spec.md §Achievements and leaderboards ("If validation is
+  unavailable, label the board casual"). The impossible-score rejection it does perform
+  (`pushBoard`) is still described. spec.md records the same constraint.
+
+### 7. Escape on the pause panel froze the match
+
+- **RESOLVED 2026-09-07.** `hideOverlay('pause')` dismissed the panel but left `AppState.PAUSED`
+  and `session.paused === true`, with no visible way back. `hideOverlay` now resumes when the
+  pause panel is closed while paused, and `resumeGame` hides the panel directly to avoid
+  recursion; Restart/Leave hide it without resuming so their confirm prompts still run paused.
+
+### 8. Resuming a saved game lost the stage/lesson it belonged to
+
+- **RESOLVED 2026-09-07.** `Session.restore` accepts `{content, lesson}` and `resumeSnapshot`
+  resolves the saved `contentId` into `app.lesson` for lessons and `app.content` otherwise.
+  Previously a resumed lesson crashed `enterGameScreen` (`app.lesson.title` on a stale null) and
+  a resumed stage scored as an anonymous match (`results.contentId === null`, no goal chip).
+
+### 9. Watching a replay double-counted progression
+
+- **RESOLVED 2026-09-07.** `watchReplay` clears `app.replayMode` before calling `showResults`
+  again with the real session, so `updateProgression` ran a second time — inflating games played,
+  captures, crowned, achievements and pushing a duplicate board row. Progression is now applied
+  at most once per session (`session.progressionApplied`).
+
+### 10. Hosted results used seat 0 instead of the player's own seat
+
+- **RESOLVED 2026-09-07.** `updateProgression`, `pushBoard` and the win/lose sting in
+  `onSessionEvent` now derive `mySeat` from `app.hosted.seat` in hosted play, so a player in
+  seat 1-3 no longer records another seat's win/captures (and no longer hears a victory sting
+  for seat 0's win).
+
+### 11. `favicon.svg` and `icon.png` 404ed when served by `server.js`
+
+- **RESOLVED 2026-09-07.** The static allowlist in `serveStatic` covered only `index.html`,
+  `styles.css`, `favicon.ico` and the asset directories, so the icon `index.html` references
+  failed under the game's own host. Both root icons are now allowed. `index.html` also carried a
+  leftover placeholder data-URI `<link rel="icon">` after the real artwork landed; it is removed
+  and an `apple-touch-icon` points at `icon.png`.
+
+### 12. Pausing did not stop the AI turn already scheduled
+
+- **RESOLVED 2026-09-07.** `Session.driveAI` only checked `paused` at the top of the loop, so a
+  pace timer that had already fired played one more AI move after the pause panel opened.
+  `pauseGame` now calls `cancelPending()`, and `driveAI` re-checks `paused`/`cancelled` after the
+  pace tick. `cancelPending` resolves the waiter (instead of leaving it hanging) so resuming can
+  re-drive the AI.
 
 ## Suspected — not confirmed
 

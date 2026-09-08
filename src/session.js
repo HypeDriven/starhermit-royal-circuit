@@ -41,6 +41,8 @@ export class Session {
     this.endedAt = null;
     this.history = []; // snapshot stack for undo
     this.pendingTimer = null;
+    this.pendingResolve = null;
+    this.cancelled = false;
     this.paused = false; // UI pause: AI drive halts at the next decision point
 
     const players = opts.players.map((p, i) => ({
@@ -133,10 +135,17 @@ export class Session {
 
   /** Drive AI turns until a human (or game over) is on move. Async-paced. */
   async driveAI(paceMs = 650) {
+    this.cancelled = false;
     while (!this.isOver && !this.paused && this.currentPlayer.kind === 'ai') {
-      await new Promise((res) => { this.pendingTimer = setTimeout(res, paceMs); });
+      await new Promise((res) => {
+        this.pendingResolve = res;
+        this.pendingTimer = setTimeout(res, paceMs);
+      });
       this.pendingTimer = null;
-      if (this.isOver) break;
+      this.pendingResolve = null;
+      // Pausing (or leaving) between the pace tick and the decision must stop
+      // the AI here, not one move later.
+      if (this.isOver || this.paused || this.cancelled) break;
       const acts = this.actions;
       const seat = this.state.turnIndex;
       if (acts.type === 'roll') {
@@ -151,8 +160,11 @@ export class Session {
     }
   }
 
+  /** Drop a scheduled AI turn. The waiter is resolved so driveAI unwinds. */
   cancelPending() {
+    this.cancelled = true;
     if (this.pendingTimer) { clearTimeout(this.pendingTimer); this.pendingTimer = null; }
+    if (this.pendingResolve) { const r = this.pendingResolve; this.pendingResolve = null; r(); }
   }
 
   /** Hint via the same legal-action API + master-level scorer. */
@@ -232,11 +244,14 @@ export class Session {
   }
 
   /** Restore a persisted solo snapshot. */
-  static restore(doc, onEvent) {
+  static restore(doc, onEvent, { content = null, lesson = null } = {}) {
     const s = new Session({
       mode: doc.mode, ruleset: doc.state.ruleset, seed: doc.envelope.seed,
       players: doc.state.players.map((p) => ({ name: p.name, kind: p.kind })),
       ranked: doc.ranked, undoAllowed: doc.undoAllowed, onEvent,
+      // content/lesson carry the goal + record id; without them a resumed
+      // stage scores as an anonymous match.
+      content, lesson,
     });
     s.state = doc.state;
     s.envelope = doc.envelope;
