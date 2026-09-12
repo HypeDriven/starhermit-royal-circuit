@@ -749,13 +749,45 @@ export function createRenderer(canvas, opts = {}) {
     };
   }
 
+  // Scale the authored view so the whole board (ring, approach lanes and
+  // workshops, plus float height) projects inside the canvas with a margin
+  // for the top HUD and bottom tray, at any aspect ratio.
+  function fitScale(view) {
+    const probe = new THREE.PerspectiveCamera(camera.fov, camera.aspect || 1, 0.1, 400);
+    const pts = [];
+    const r = WORKSHOP_RADIUS + 1.2;
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      pts.push(new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r));
+      pts.push(new THREE.Vector3(Math.cos(a) * r, 1.6, Math.sin(a) * r));
+    }
+    const yMax = 0.72, yMin = -0.82, xLim = 0.94; // top HUD / bottom tray bands
+    const v = new THREE.Vector3();
+    let k = 1;
+    for (let i = 0; i < 12; i++) {
+      probe.position.set(Math.sin(R.camTarget.az) * view.dist * k, view.height * k, -Math.cos(R.camTarget.az) * view.dist * k);
+      probe.lookAt(0, 0, 0);
+      probe.updateMatrixWorld();
+      probe.updateProjectionMatrix();
+      let over = 0;
+      for (const p of pts) {
+        v.copy(p).project(probe);
+        over = Math.max(over, Math.abs(v.x) / xLim, v.y / yMax, -v.y / -yMin);
+      }
+      if (over <= 1) break;
+      k *= Math.min(1.5, over + 0.01);
+    }
+    return k;
+  }
+
   function setCameraMode(mode) {
     if (!CAMERA_VIEWS[mode]) mode = 'auto';
     R.cam.mode = mode;
     const v = CAMERA_VIEWS[mode];
-    R.camTarget.dist = v.dist;
-    R.camTarget.height = v.height;
-    if (R.reducedMotion) { R.cam.dist = v.dist; R.cam.height = v.height; }
+    const k = fitScale(v);
+    R.camTarget.dist = v.dist * k;
+    R.camTarget.height = v.height * k;
+    if (R.reducedMotion) { R.cam.dist = R.camTarget.dist; R.cam.height = R.camTarget.height; }
   }
 
   function resetCamera() {
@@ -767,7 +799,10 @@ export function createRenderer(canvas, opts = {}) {
   /** Pointer-drag camera orbit (delta in CSS px). */
   function orbit(dx, dy) {
     R.camTarget.az += dx * 0.005;
-    R.camTarget.height = Math.min(34, Math.max(4, R.camTarget.height - dy * 0.04));
+    // pitch stays between a readable low angle and top-down; distance is kept
+    // at the fitted value so the board never leaves the frame
+    const minH = Math.max(6, R.camTarget.dist * 0.35), maxH = Math.max(minH + 1, R.camTarget.dist * 1.6);
+    R.camTarget.height = Math.min(maxH, Math.max(minH, R.camTarget.height - dy * 0.04));
   }
 
   function resize() {
@@ -776,6 +811,7 @@ export function createRenderer(canvas, opts = {}) {
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+    setCameraMode(R.cam.mode || 'auto'); // refit for the new aspect
   }
 
   function stats() {
@@ -822,6 +858,13 @@ export function createRenderer(canvas, opts = {}) {
       -Math.cos(R.cam.az) * R.cam.dist + sz,
     );
     camera.lookAt(0, 0, 0);
+    // fog tracks the fitted distance so a far-fitted (portrait) camera never
+    // fogs the board itself out
+    if (scene.fog) {
+      const camLen = Math.hypot(R.cam.dist, R.cam.height);
+      scene.fog.near = camLen + WORKSHOP_RADIUS * 0.6;
+      scene.fog.far = camLen + WORKSHOP_RADIUS * 3.2;
+    }
   }
 
   function loop(t) {

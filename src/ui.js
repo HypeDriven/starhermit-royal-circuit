@@ -1060,18 +1060,45 @@ function buildFloatPicker(moves) {
 function positionPicker() {
   const pk = $('#float-picker');
   if (!app.renderer || document.body.classList.contains('no-gl')) return;
+  // Compact layouts keep the picker as a docked legal-action tray (CSS); the
+  // floating per-float placement is desktop-only. Off-screen projections
+  // always fall back to the docked position.
+  if (window.matchMedia('(max-width: 1023px)').matches) {
+    for (const b of pk.querySelectorAll('button')) { b.style.position = ''; b.style.left = ''; b.style.top = ''; }
+    return;
+  }
   const state = app.session.state;
   const seat = state.turnIndex;
-  for (const b of pk.querySelectorAll('button')) {
+  const buttons = [...pk.querySelectorAll('button')];
+  const cr = pk.getBoundingClientRect();
+  const placed = [];
+  for (const b of buttons) {
     const fid = Number(b.dataset.float);
     const p = state.players[seat].floats[fid];
     const pos = floatPos(state.ruleset, seat, p < 0 ? fid : p, fid, 1);
     const scr = app.renderer.projectToScreen(pos);
-    if (scr.visible) {
-      b.style.position = 'fixed';
-      b.style.left = `${Math.round(scr.x - b.offsetWidth / 2)}px`;
-      b.style.top = `${Math.round(scr.y - 52)}px`;
-    }
+    const inView = scr.visible && scr.x > 8 && scr.x < window.innerWidth - 8 && scr.y > 60 && scr.y < window.innerHeight - 120;
+    if (!inView) { placed.length = 0; break; }
+    const w = b.offsetWidth, h = b.offsetHeight;
+    const x = Math.min(window.innerWidth - w - 8, Math.max(8, scr.x - w / 2));
+    const y = Math.min(window.innerHeight - 100, Math.max(60, scr.y - 52));
+    placed.push({ b, x, y, w, h });
+  }
+  // Floats sharing a tile (e.g. all four waiting on the start tile) would
+  // stack their buttons on top of each other; any overlap docks the whole
+  // picker into the tray row so every option stays tappable.
+  const overlaps = placed.some((a, i) => placed.some((o, j) => j > i &&
+    a.x < o.x + o.w && o.x < a.x + a.w && a.y < o.y + o.h && o.y < a.y + a.h));
+  if (!placed.length || overlaps) {
+    for (const b of buttons) { b.style.position = ''; b.style.left = ''; b.style.top = ''; }
+    return;
+  }
+  // Position relative to the picker container (a transformed ancestor would
+  // turn `fixed` into an offset, misplaced box).
+  for (const { b, x, y } of placed) {
+    b.style.position = 'absolute';
+    b.style.left = `${Math.round(x - cr.left)}px`;
+    b.style.top = `${Math.round(y - cr.top)}px`;
   }
 }
 
@@ -1967,6 +1994,16 @@ function bindHud() {
   $('#btn-pass').addEventListener('click', doPass);
   $('#btn-undo').addEventListener('click', doUndo);
   $('#btn-hint').addEventListener('click', doHint);
+  // compact rails: tap-to-open drawers (one at a time), closed by default
+  for (const t of document.querySelectorAll('.rail-toggle')) {
+    t.addEventListener('click', () => {
+      const rail = document.getElementById(t.dataset.rail);
+      const open = !rail.classList.contains('open');
+      for (const r of document.querySelectorAll('.rail')) r.classList.remove('open');
+      for (const o of document.querySelectorAll('.rail-toggle')) o.setAttribute('aria-expanded', 'false');
+      if (open) { rail.classList.add('open'); t.setAttribute('aria-expanded', 'true'); }
+    });
+  }
   $('#btn-board-state').addEventListener('click', openBoardState);
   $('#btn-pause').addEventListener('click', () => pauseGame('button'));
 }

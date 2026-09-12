@@ -353,13 +353,20 @@ body.left-handed .action-tray { left: auto; right: calc(14px + var(--sar)); tran
 body.left-handed .float-picker { left: auto; right: calc(14px + var(--sar)); transform: none; }
 
 /* ---------- responsive breakpoints ---------- */
-/* compact desktop / tablet: rails become drawers */
+.rail-toggles { display: none; }
+/* compact desktop / tablet: rails become drawers, closed by default so they
+   never sit over the board or intercept float taps */
 @media (max-width: 1023px) {
   .rail { position: absolute; top: auto; bottom: calc(86px + var(--sab)); transform: none;
-    max-height: 44vh; overflow: auto; width: min(300px, 78vw); z-index: 5; }
+    max-height: 44vh; overflow: auto; width: min(300px, 78vw); z-index: 5; display: none; }
+  .rail.open { display: block; }
   .rail-left { left: calc(10px + var(--sal)); }
   .rail-right { right: calc(10px + var(--sar)); }
-  .rail.collapsed { display: none; }
+  .rail-toggles { display: flex; gap: 6px; position: absolute; top: calc(52px + var(--sat)); right: calc(10px + var(--sar)); z-index: 6; }
+  .rail-toggles .btn { min-height: 40px; padding: 6px 12px; font-size: 13px; }
+  /* legal-action picker: a docked row above the tray, never over the board */
+  .float-picker { bottom: calc(92px + var(--sab)); }
+  .float-picker button { position: static !important; }
   .title-grid { grid-template-columns: repeat(2, 1fr); }
 }
 /* portrait mobile */
