@@ -17,7 +17,7 @@ import {
 import { AI_LEVELS, aiName, hintMove } from './ai.js';
 import { floatPos, diePos } from './boardlayout.js';
 import {
-  loadSave, storeSave, loadSettings, storeSettings, loadSnapshot, clearSnapshot,
+  loadSave, storeSave, serializeSave, parseDoc, loadSettings, storeSettings, loadSnapshot, clearSnapshot,
 } from './save.js';
 import { EVENT_CAPTIONS } from './audio.js';
 
@@ -78,6 +78,45 @@ function toast(text, kind = 'info', ms = 3400) {
   const t = el('div', { class: `toast ${kind}`, role: 'status', text });
   $('#toast-root').append(t);
   setTimeout(() => t.remove(), ms);
+}
+
+/* ----- platform identity + persistence ----- */
+
+/** The player's display name: account nickname when hosted, local name otherwise. */
+function displayName() {
+  return (app.platform?.hosted && app.platform.nickname) || app.save.profile.name;
+}
+
+/** Local write + cloud mirror (debounced; no-op when offline). */
+function persistSave() {
+  storeSave(app.save);
+  app.platform?.queueCloudSave(serializeSave(app.save));
+}
+
+const SYNC_LABELS = { synced: '☁ synced', saving: '☁ saving…', error: '☁ offline' };
+function renderSyncStatus() {
+  const n = $('#sync-status');
+  if (!n) return;
+  const p = app.platform;
+  n.textContent = (p?.hosted && SYNC_LABELS[p.syncStatus]) || '';
+}
+
+/** Hosted boot: apply the remote save (remote wins) and account nickname. */
+async function applyPlatformIdentity() {
+  const p = app.platform;
+  if (!p?.hosted) return;
+  p.onSyncChange = renderSyncStatus;
+  try {
+    const doc = await p.cloudLoad();
+    const payload = doc && parseDoc(doc);
+    if (payload && payload.profile && payload.stats) {
+      app.save = payload;
+      storeSave(app.save);
+    }
+  } catch { /* keep the local cache */ }
+  try { await p.fetchNickname(); } catch { /* fallback name already set */ }
+  renderSyncStatus();
+  if (app.state === AppState.TITLE || app.state === AppState.PROFILE) showTitle();
 }
 
 function announce(region, text) {
@@ -340,12 +379,16 @@ function showTitle() {
   setState(AppState.TITLE, 'show-title');
   showScreen('title');
   if (app.audio) { app.audio.setMusic('title'); }
-  $('#profile-name').textContent = app.save.profile.name;
+  $('#profile-name').textContent = displayName();
+  renderSyncStatus();
   const done = Object.keys(app.save.journey).length;
   $('#journey-sub').textContent = done ? `${done}/40 stages complete` : '40 festival stages';
   const today = dailyForDate(new Date(app.platform.now()));
   const rec = app.save.dailies[today.date];
   $('#daily-sub').textContent = rec ? `Today: ${rec.won ? 'won' : 'played'} · score ${rec.score}` : 'One shared race each day';
+  if ($('#hosted-sub')) {
+    $('#hosted-sub').textContent = app.platform?.hosted ? 'Coming soon to this build' : 'Rooms with friends';
+  }
   // resume offer
   const snap = loadSnapshot();
   if (snap && snap.state && snap.state.phase !== 'over' && !app._resumeOffered) {
@@ -449,7 +492,7 @@ function showSetup(mode, content = null, lesson = null) {
 
   $('#setup-start').onclick = () => {
     if (mode === 'practice') {
-      const players = [{ name: app.save.profile.name, kind: 'human' }];
+      const players = [{ name: displayName(), kind: 'human' }];
       for (let i = 1; i < cfg.players; i++) players.push({ kind: 'ai', level: cfg.aiLevel, name: aiName(cfg.aiLevel, i - 1) });
       startGame({
         mode, players, seed: (Math.random() * 0xffffffff) >>> 0,
@@ -462,13 +505,13 @@ function showSetup(mode, content = null, lesson = null) {
     } else if (mode === 'learn') {
       startGame({
         mode, lesson, seed: lesson.ruleset.seed, ruleset: lesson.ruleset,
-        players: [{ name: app.save.profile.name, kind: 'human' }, { kind: 'ai', level: 1, name: aiName(1, 0) }],
+        players: [{ name: displayName(), kind: 'human' }, { kind: 'ai', level: 1, name: aiName(1, 0) }],
         ranked: false, undoAllowed: true,
       });
     } else {
       // journey / daily / challenge content-driven
       const def = content;
-      const players = [{ name: app.save.profile.name, kind: 'human' }];
+      const players = [{ name: displayName(), kind: 'human' }];
       for (const ai of def.ai) players.splice(ai.seat, 0, { kind: 'ai', level: ai.level, name: aiName(ai.level, ai.seat - 1) });
       players.sort((a, b) => 0); // seats are by array order already
       startGame({
@@ -599,6 +642,7 @@ function showBoards(board = 'daily') {
   });
   const body = $('#boards-body');
   body.innerHTML = '';
+  const hosted = app.platform?.hosted;
   const rows = app.save.leaderboards[board === 'daily' ? 'daily' : 'best'];
   if (!rows.length) {
     body.append(el('p', { class: 'muted', text: board === 'daily'
@@ -622,7 +666,39 @@ function showBoards(board = 'daily') {
     });
     table.append(tb);
     body.append(table);
-    body.append(el('p', { class: 'hint', text: 'Casual board — these records are stored on this device only and are not submitted or compared against other players. Each row keeps its ruleset, content version, seed and duration; impossible scores are rejected before they are recorded.' }));
+    body.append(el('p', { class: 'hint', text: hosted
+      ? 'Personal bests — these records live on this device and sync with your account; they are never submitted as ranked scores. Each row keeps its ruleset, content version, seed and duration; impossible scores are rejected before they are recorded.'
+      : 'Casual board — these records are stored on this device only and are not submitted or compared against other players. Each row keeps its ruleset, content version, seed and duration; impossible scores are rejected before they are recorded.' }));
+  }
+  // Read-only platform board (script-owned): shown when the host provides one.
+  if (hosted) {
+    const slot = el('div', {});
+    slot.append(el('p', { class: 'muted', text: 'Loading the festival leaderboard…' }));
+    body.append(slot);
+    app.platform.fetchGlobalBoard().then((entries) => {
+      if ($('#overlay-boards').hidden) return; // closed while fetching
+      slot.innerHTML = '';
+      if (!entries || !entries.length) {
+        slot.append(el('p', { class: 'muted', text: 'No platform leaderboard for this board yet — personal bests above are the record.' }));
+        return;
+      }
+      slot.append(el('h3', { text: 'Festival leaderboard' }));
+      const table = el('table', { class: 'result-table' });
+      table.innerHTML = '<thead><tr><th>#</th><th>Player</th><th class="num">Score</th></tr></thead>';
+      const tb = el('tbody', {});
+      for (const e of entries) {
+        const tr = el('tr', {});
+        tr.append(
+          el('td', { text: String(e.rank) }),
+          el('td', { text: e.name }),
+          el('td', { class: 'num', text: String(e.score) }),
+        );
+        tb.append(tr);
+      }
+      table.append(tb);
+      slot.append(table);
+      slot.append(el('p', { class: 'hint', text: 'Ranked scores are owned by the platform — this build reads the board but cannot submit to it.' }));
+    });
   }
   showOverlay('boards');
 }
@@ -632,29 +708,37 @@ function showProfile() {
   body.innerHTML = '';
   const p = app.save.profile;
   const st = app.save.stats;
-  body.append(el('div', { class: 'field' }, ));
+  const hosted = app.platform?.hosted;
   const nameField = el('div', { class: 'field' });
   nameField.append(el('label', { class: 'field-label', for: 'prof-name', text: 'Display name' }));
-  const input = el('input', { type: 'text', id: 'prof-name', value: p.name, maxlength: 20 });
-  input.addEventListener('change', () => {
-    p.name = input.value.trim().slice(0, 20) || 'Guest Envoy';
-    storeSave(app.save);
-    $('#profile-name').textContent = p.name;
-    toast('Name saved.');
-  });
-  nameField.append(input);
+  if (hosted) {
+    // The account nickname comes from the platform profile; it is not editable here.
+    nameField.append(el('div', { id: 'prof-name', class: 'field-label', text: displayName() }));
+  } else {
+    const input = el('input', { type: 'text', id: 'prof-name', value: p.name, maxlength: 20 });
+    input.addEventListener('change', () => {
+      p.name = input.value.trim().slice(0, 20) || 'Guest Envoy';
+      persistSave();
+      $('#profile-name').textContent = displayName();
+      toast('Name saved.');
+    });
+    nameField.append(input);
+  }
   body.append(nameField);
   const stats = el('div', { class: 'summary-card' });
   stats.innerHTML = `<b>Games:</b> ${st.gamesPlayed} · <b>Won:</b> ${st.gamesWon}<br>` +
     `<b>Captures:</b> ${st.captures} · <b>Floats crowned:</b> ${st.crowned}<br>` +
     `<b>Daily streak:</b> ${st.streakDays} day(s)<br>` +
-    `<b>Account:</b> Guest — progress is stored on this device. Sign-in arrives with the host shell; nothing is uploaded without it.`;
+    (hosted
+      ? `<b>Account:</b> Signed in via the platform — progress syncs to your account (${SYNC_LABELS[app.platform.syncStatus] || '☁ synced'}). This device keeps an offline copy.`
+      : `<b>Account:</b> Guest — progress is stored on this device. Sign-in arrives with the host shell; nothing is uploaded without it.`);
   body.append(stats);
   const wipe = el('button', { class: 'btn danger', text: 'Erase all local progress' });
   wipe.addEventListener('click', async () => {
     if (await confirmDialog('Erase all local progress, settings stay. This cannot be undone.')) {
       localStorage.removeItem('royal-circuit:save:v1');
       app.save = loadSave();
+      if (hosted) app.platform.queueCloudSave(serializeSave(app.save)); // mirror the wipe
       toast('Progress erased.');
       hideOverlay('profile');
       showTitle();
@@ -754,7 +838,7 @@ function updateProgression(results) {
   if ((results.mode === 'challenge' || results.mode === 'journey' || results.mode === 'daily')) {
     pushBoard('best', results, me, mySeat);
   }
-  storeSave(s);
+  persistSave();
 }
 
 function pushBoard(board, results, me, mySeat = 0) {
@@ -1168,7 +1252,7 @@ function finishLesson() {
   if (!app.save.lessons[app.lesson.id]) {
     app.save.lessons[app.lesson.id] = { done: true, at: new Date().toISOString() };
     if (Object.keys(app.save.lessons).length >= LESSONS.length) unlock('scholar');
-    storeSave(app.save);
+    persistSave();
   }
   showResults(true);
 }
@@ -1649,16 +1733,23 @@ function showHosted() {
 async function renderHostedHome(note = '') {
   const body = $('#hosted-body');
   body.innerHTML = '';
-  body.append(el('p', { class: 'muted', text: 'Rooms run on this host: the server owns the dice, the rules and the results.' }));
-  if (!app.platform.hosted) {
-    body.append(el('div', { class: 'summary-card', html: '<b>Offline.</b> Hosted play needs the game server; this copy is served statically. Every solo mode works offline.' }));
+  if (app.platform.hosted) {
+    // On-platform rooms are not migrated yet: the old own-server relay does not
+    // exist here, so the entry point is disabled honestly instead of failing.
+    body.append(el('p', { class: 'muted', text: 'Rooms with friends, run by an authoritative host.' }));
+    body.append(el('div', { class: 'summary-card', html: '<b>Not available yet.</b> Online rooms on this platform build are still being migrated from the old host relay. Every solo mode — journey, daily, practice, lessons, challenges — is fully playable.' }));
     return;
   }
+  body.append(el('p', { class: 'muted', text: 'Rooms run on this host: the server owns the dice, the rules and the results.' }));
   const status = el('p', { class: 'muted', text: note || 'Connecting…' });
   body.append(status);
   const ok = await app.platform.connect();
   if (app.hosted) return; // a room was joined while connecting
-  if (!ok) { status.textContent = 'Could not reach the hosted-play relay. Try again later.'; return; }
+  if (!ok) {
+    status.remove();
+    body.append(el('div', { class: 'summary-card', html: '<b>Offline.</b> Hosted play needs the game server; this copy is served statically. Every solo mode works offline.' }));
+    return;
+  }
   status.textContent = note;
 
   // create form
@@ -1670,7 +1761,7 @@ async function renderHostedHome(note = '') {
   const createBtn = el('button', { class: 'btn primary', text: 'Create room' });
   createBtn.addEventListener('click', async () => {
     createBtn.disabled = true;
-    const rep = await app.platform.createRoom({ name: app.save.profile.name, seats: cfg.seats, privacy: cfg.privacy });
+    const rep = await app.platform.createRoom({ name: displayName(), seats: cfg.seats, privacy: cfg.privacy });
     createBtn.disabled = false;
     if (rep.t !== 'room') { toast(`Could not create room (${rep.error || 'error'}).`, 'error'); return; }
     enterLobby(rep);
@@ -1717,7 +1808,7 @@ async function renderHostedHome(note = '') {
 async function joinRoomByCode(code) {
   code = String(code || '').trim().toUpperCase();
   if (!/^[A-Z2-9]{4}$/.test(code)) { toast('Room codes are 4 letters/digits.', 'error'); return; }
-  const rep = await app.platform.joinRoom(code, app.save.profile.name);
+  const rep = await app.platform.joinRoom(code, displayName());
   if (rep.t !== 'room') { toast(`Could not join (${rep.error || 'error'}).`, 'error'); return; }
   enterLobby(rep);
 }
@@ -1805,7 +1896,7 @@ async function onHostedClosed() {
     await new Promise((r) => setTimeout(r, 1200 * (attempt + 1)));
     if (!app.hosted) return;
     if (!await app.platform.connect()) continue;
-    const rep = await app.platform.joinRoom(app.hosted.code, app.save.profile.name, app.hosted.seatToken);
+    const rep = await app.platform.joinRoom(app.hosted.code, displayName(), app.hosted.seatToken);
     if (rep.t !== 'room') continue;
     if (rep.snapshot && app.session) {
       app.session.applySnapshot(rep.snapshot, []);
@@ -1953,6 +2044,7 @@ export function init({ platform, renderer, audio }) {
   if (app.renderer) app.renderer.setTheme(themeById(app.settings.theme));
   setState(AppState.PROFILE, 'profile-loaded');
   showTitle();
+  applyPlatformIdentity(); // hosted: pull cloud save + account nickname, then refresh the title
 }
 
 export const UI = { init, AppState };

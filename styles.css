@@ -94,6 +94,7 @@ body {
   cursor: pointer; min-height: 44px;
 }
 .chip:hover { background: rgba(255,255,255,.14); }
+.sync-status { font-size: .78em; opacity: .75; }
 
 /* ---------- boot ---------- */
 #screen-boot { align-items: center; justify-content: center; background: radial-gradient(ellipse at 50% 35%, #241a4a 0%, var(--bg) 70%); }

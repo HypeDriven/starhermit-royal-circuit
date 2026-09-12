@@ -30,7 +30,7 @@ async function boot() {
 
   // Host handshake: clock sync + launch scope; degrades to local when static.
   const platform = await new Platform().init();
-  bootProgress(30, platform.hosted ? 'Host found — clocks synchronized.' : 'Playing locally (no host).');
+  bootProgress(30, platform.hosted ? 'Signed in — your festival pass is active.' : 'Playing locally (no host).');
 
   // Audio is fully procedural; safe to construct before the first gesture.
   const audio = createAudio();

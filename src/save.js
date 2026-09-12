@@ -91,6 +91,14 @@ export function loadSave() {
 export function storeSave(save) {
   return write(KEY, save);
 }
+/** Wrapped document for the cloud mirror (version + checksum + payload). */
+export function serializeSave(save) {
+  return wrap(save);
+}
+/** Parse a wrapped document (local or cloud); null when invalid/future. */
+export function parseDoc(doc) {
+  return unwrap(doc);
+}
 export function loadSettings() {
   const s = read(SETTINGS_KEY);
   // merge over defaults so new settings keys appear automatically

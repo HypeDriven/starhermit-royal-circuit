@@ -185,16 +185,16 @@ No module may mutate rules state except through a validated command. Rendering c
 
 ### Packaging and launch
 - Ship a browser distribution with `starhermit.txt` at its root, `name=Royal Circuit`, and `launch=index.html`. Keep source files, secrets, design documents, and source maps outside the uploaded distribution.
-- Read the game scope from the short-lived launch token rather than hard-coding a slug. Use same-origin `/api` and `/ws` routes when hosted. Refresh account tokens through the host shell; never persist access or launch tokens in local storage.
-- Synchronize countdowns and daily boundaries with `GET /api/v1/time` using round-trip-adjusted offset. Treat rate limits and structured `{"error":"..."}` responses as recoverable UI states.
+- Read the game scope from the short-lived launch token (URL fragment `#game_token=`, stripped on read) rather than hard-coding a slug. Use same-origin `/api` routes when hosted, with `Authorization: Bearer` on every call; re-mint scoped tokens via `POST /api/v1/games/{slug}/launch-token` every 45 min. Query-token fallbacks are local-dev only. Never persist access or launch tokens in local storage.
+- Clock sync via `GET /api/v1/time` (round-trip-adjusted) is available on the game's own dev server only; the platform build keeps device time. Treat rate limits and structured `{"error":"..."}` responses as recoverable UI states.
 
 ### Identity, profile, presence, and preferences
-- Support guest practice locally, then offer account sign-in for durable progress. Use the profile display name and avatar only where identity is useful, honor profile privacy, and send throttled presence heartbeats while actively playing.
+- Support guest practice locally, then offer account sign-in for durable progress. Use the account nickname (from `GET /api/v1/users/{id}/profile`) where identity is useful, honor profile privacy, and keep presence host-owned — the game sends no presence of its own.
 - Store accessibility, audio, graphics tier, tutorial completion, camera preference, and rules options through per-game settings. Declare desktop action bindings and read player overrides; touch mappings remain responsive UI controls.
-- Cloud-save progression as a versioned, checksummed document. Resolve conflicts by preserving both snapshots and asking the player when neither is a strict descendant. Never place credentials or private chat in saves.
+- Cloud-save progression as a versioned, checksummed document, mirrored to the platform cloud-save slot (`/api/v1/me/cloud-saves/{slug}`, zip+base64) when signed in; localStorage remains the offline cache and remote wins on conflict. Resolve conflicts by preserving both snapshots and asking the player when neither is a strict descendant. Never place credentials or private chat in saves.
 
 ### Discovery, activity, and social layer
-- Start and end launch activity so playtime is accurate. Surface entitlement or catalog state only in host-owned chrome; the game itself must remain playable without promotional interruption.
+- Playtime/activity reporting belongs to the host shell; the game calls no activity endpoints of its own. Surface entitlement or catalog state only in host-owned chrome; the game itself must remain playable without promotional interruption.
 - Provide a compact friends panel for score comparison and invitations where appropriate. Respect presence visibility and do not expose a hidden or private profile through game UI.
 - Use friend invitations and the game-invite inbox for private sessions. Text chat belongs in a collapsible, moderated panel with block/report hooks, unread state, a 10-message-per-minute-aware composer, and no chat over critical controls.
 - Offer voice rooms only as an explicit opt-in after joining a compatible conversation. Default muted, expose speaking/mute indicators, and provide leave/report controls. Core rules must never require voice.
@@ -203,7 +203,7 @@ No module may mutate rules state except through a validated command. Rendering c
 - Declare a small static achievement set: first completion, mechanic mastery, a sustained streak, a difficult content milestone, and an accessibility-neutral long-term goal. Keys are stable, lowercase identifiers; unlocks are idempotent.
 - Provide global and friends-filtered boards for the primary metric plus a fair daily/weekly board. Include ruleset, content version, seed, assists, and duration with every submission; reject impossible or stale-version scores.
 - Competitive outcomes, rating changes, and achievement unlocks are server-authoritative. Never accept a client-supplied winner, score, hidden state, or elapsed time as truth.
-- Until authoritative board submission exists, records are kept on the player's own device and the boards screen must say so and present them as casual. Never claim validation the build does not perform.
+- Until authoritative board submission exists, records are kept on the player's own device and the boards screen must say so and present them as casual. Never claim validation the build does not perform. When hosted, the boards screen may additionally render the platform leaderboard read-only (`GET /api/v1/games/{slug}` → `GET /api/v1/leaderboards/{id}/entries`); clients never submit scores.
 
 ### Sessions and transport
 - Use the shared Games API for invitations, nearest-rating matchmaking where competitive, practice sessions against deterministic AI where suitable, session summaries, deadlines, move submission, and replays.
