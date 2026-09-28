@@ -8,6 +8,7 @@
  */
 
 import { hashString } from './rng.js';
+import { migrateGraphics } from './gfx.js';
 
 export const SAVE_VERSION = 1;
 const KEY = 'royal-circuit:save:v1';
@@ -29,7 +30,8 @@ export function defaultSave() {
 export function defaultSettings() {
   return {
     audio: { music: 0.7, effects: 0.9, ambience: 0.6, voice: 0.8, muted: false },
-    graphics: { tier: 'auto', renderScale: 1 },
+    // gfx.js model: preset auto|low|balanced|high|ultra, per-category overrides
+    graphics: { preset: 'auto', render_scale: 1, adaptive: true, show_fps: false },
     accessibility: {
       reducedMotion: false, highContrast: false, largeText: false,
       palette: 'standard', leftHanded: false, holdToConfirm: false,
@@ -107,7 +109,7 @@ export function loadSettings() {
   return {
     ...d, ...s,
     audio: { ...d.audio, ...(s.audio || {}) },
-    graphics: { ...d.graphics, ...(s.graphics || {}) },
+    graphics: { ...d.graphics, ...migrateGraphics(s.graphics) },
     accessibility: { ...d.accessibility, ...(s.accessibility || {}) },
     camera: { ...d.camera, ...(s.camera || {}) },
     input: { ...d.input, ...(s.input || {}) },

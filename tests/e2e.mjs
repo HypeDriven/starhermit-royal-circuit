@@ -218,6 +218,70 @@ async function startJourneyStage1(page) {
   await page.waitForSelector('#screen-game.active', { state: 'visible' });
 }
 
+// ---------- graphics settings (real visible UI) ----------
+// Opens Settings → Graphics with a real pointer/touch press, switches the
+// quality preset Low → High, overrides one category, checks the renderer
+// applied it (data-gfx-preset on the canvas + the summary line), reloads to
+// prove persistence, then returns to Auto (Low on the headless software GPU)
+// so the playthrough stays fast.
+async function graphicsPass(page, name, touch) {
+  const press1 = (loc) => (touch ? loc.tap() : loc.click());
+  const openGraphics = async () => {
+    await press1(page.locator('#chip-settings'));
+    await page.waitForFunction(() => !document.getElementById('overlay-settings').hidden);
+    await press1(page.locator('#tab-graphics'));
+    await page.waitForSelector('#gfx-preset', { state: 'visible' });
+  };
+  const presetIs = (p) => page.waitForFunction((p) => document.getElementById('gl').dataset.gfxPreset === p
+    && (document.getElementById('gfx-summary')?.dataset.preset ?? p) === p, p, { timeout: 8000 });
+
+  await openGraphics();
+  const autoLabel = await page.locator('#gfx-preset option[value="auto"]').textContent();
+  if (!/Auto/.test(autoLabel)) throw new Error(`auto option label unexpected: ${autoLabel}`);
+  await page.selectOption('#gfx-preset', 'low');
+  await presetIs('low');
+  await page.selectOption('#gfx-preset', 'high');
+  await presetIs('high');
+  await page.waitForFunction(() => /2048² shadows/.test(document.getElementById('gfx-summary').textContent));
+  // one override: bloom off
+  await page.selectOption('#gfx-bloom', 'off');
+  await page.waitForFunction(() => !/bloom/.test(document.getElementById('gfx-summary').textContent.split('·').slice(1).join('·')));
+  // render scale slider (keyboard on the real control)
+  await page.locator('#gfx-scale').focus();
+  await page.keyboard.press('ArrowLeft');
+  const scaleText = (await page.textContent('#gfx-scale-value')).trim();
+  if (scaleText !== '95%') throw new Error(`render scale did not change: ${scaleText}`);
+  // the panel fits: the Done button and the preset select are on screen
+  const vp = page.viewportSize();
+  for (const sel of ['#settings-close', '#gfx-preset']) {
+    const b = await page.locator(sel).boundingBox();
+    if (!b || b.x < 0 || b.x + b.width > vp.width + 1) throw new Error(`${sel} cut off horizontally`);
+  }
+  await page.screenshot({ path: SHOT('graphics', name) });
+
+  // survives reload
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForSelector('#screen-title.active', { state: 'visible', timeout: 20000 });
+  await page.waitForFunction(() => document.getElementById('gl').dataset.gfxPreset === 'high', null, { timeout: 8000 });
+  await openGraphics();
+  const kept = await page.evaluate(() => ({
+    preset: document.getElementById('gfx-preset').value,
+    bloom: document.getElementById('gfx-bloom').value,
+    scale: document.getElementById('gfx-scale').value,
+  }));
+  if (kept.preset !== 'high' || kept.bloom !== 'off' || kept.scale !== '95') {
+    throw new Error(`graphics settings not persisted: ${JSON.stringify(kept)}`);
+  }
+  // choosing a preset clears overrides
+  await page.selectOption('#gfx-preset', 'auto');
+  await presetIs('low');
+  const cleared = await page.locator('#gfx-bloom').inputValue();
+  if (cleared !== 'preset') throw new Error(`preset change did not clear overrides (bloom=${cleared})`);
+  await press1(page.locator('#settings-close'));
+  await page.waitForFunction(() => document.getElementById('overlay-settings').hidden);
+  ok(`${name}: graphics settings — Low/High presets, override, render scale, persistence, Auto → low`);
+}
+
 // ---------- one pass ----------
 async function runPass(browser, name, ctxOpts, { full }) {
   const errors = [];
@@ -225,10 +289,10 @@ async function runPass(browser, name, ctxOpts, { full }) {
   const page = await context.newPage();
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
   page.on('console', (m) => {
-    if (m.type() !== 'error' || browserNoise.test(m.text())) return;
+    if ((m.type() !== 'error' && m.type() !== 'warning') || browserNoise.test(m.text())) return;
     const url = m.location()?.url || '';
     if (/Failed to load resource/.test(m.text()) && /\/api\/|\/favicon/.test(url)) return;
-    errors.push(`console: ${m.text()}`);
+    errors.push(`console ${m.type()}: ${m.text()}`);
   });
   page.on('response', (r) => {
     const p = r.url();
@@ -241,6 +305,8 @@ async function runPass(browser, name, ctxOpts, { full }) {
     await page.waitForSelector('#screen-title.active', { state: 'visible', timeout: 20000 });
     await page.screenshot({ path: SHOT('title', name) });
     ok(`${name}: title screen visible`);
+
+    await graphicsPass(page, name, !full);
 
     // enter Journey stage 1 through the real mode card (works around the
     // known broken "▶ Play" / Practice numeric-option defect, see header).

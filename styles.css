@@ -114,7 +114,7 @@ body {
 #screen-title { align-items: center; justify-content: center; overflow: auto; }
 .title-wrap { display: flex; flex-direction: column; align-items: center; gap: 18px; max-width: 760px; width: 100%; margin: auto; }
 .title-head { text-align: center; }
-.tagline { color: var(--muted); max-width: 46ch; margin: 0 auto; }
+.tagline { color: var(--muted); max-width: 46ch; margin: 0 auto; text-shadow: 0 1px 3px rgba(0,0,0,.9), 0 0 12px rgba(0,0,0,.7); }
 .btn-play {
   font-size: clamp(20px, 3vw, 28px); padding: 18px 66px; border-radius: 999px;
   background: linear-gradient(180deg, #ffd98a, var(--accent)); color: #241703; border: none;
@@ -285,6 +285,21 @@ input[type="range"] { width: 100%; accent-color: var(--accent); height: 44px; }
 .settings-body .field { border-bottom: 1px solid rgba(255,255,255,.07); padding-bottom: 12px; }
 .settings-body .field:last-child { border-bottom: none; }
 .slider-row { display: grid; grid-template-columns: 130px 1fr 46px; gap: 10px; align-items: center; }
+/* graphics section */
+.gfx-section select { width: 100%; max-width: 100%; }
+.gfx-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); column-gap: 14px; }
+.settings-body .gfx-grid .field { margin: 8px 0; }
+.gfx-slider { display: flex; align-items: center; gap: 12px; }
+.gfx-slider input { flex: 1 1 auto; min-width: 0; }
+.gfx-slider output { flex: 0 0 auto; min-width: 3.4em; text-align: right; font-variant-numeric: tabular-nums; }
+.gfx-summary { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; margin: 10px 0 4px; }
+.gfx-note { font-size: 13px; color: #ffcf8a; margin: 4px 0; }
+.fps-meter {
+  position: fixed; left: calc(6px + var(--sal, 0px)); bottom: calc(6px + var(--sab, 0px)); z-index: 40;
+  pointer-events: none; font: 600 11px/1.2 ui-monospace, monospace; color: #fff;
+  background: rgba(0,0,0,.55); padding: 3px 6px; border-radius: 6px;
+}
+.fps-meter[hidden] { display: none; }
 
 .results-panel h2 { margin-top: 0; }
 .result-head { text-align: center; margin-bottom: 14px; }

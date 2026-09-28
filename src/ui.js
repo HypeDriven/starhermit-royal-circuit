@@ -20,6 +20,8 @@ import {
   loadSave, storeSave, serializeSave, parseDoc, loadSettings, storeSettings, loadSnapshot, clearSnapshot,
 } from './save.js';
 import { EVENT_CAPTIONS } from './audio.js';
+import { PRESETS, CATEGORIES, presetTier, choosePreset } from './gfx.js';
+import { gfxStrings, fmt } from './gfxstrings.js';
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
@@ -202,7 +204,7 @@ function applySettings() {
   if (app.renderer) {
     app.renderer.setReducedMotion(a.reducedMotion);
     app.renderer.setPalette(a.palette);
-    app.renderer.setQuality(resolveTier());
+    app.renderer.setGraphics(s.graphics);
     app.renderer.setCameraMode(s.camera.mode);
   }
   if (app.audio) {
@@ -215,17 +217,6 @@ function applySettings() {
   document.documentElement.style.setProperty('--bg', themeById(s.theme).bgCss);
 }
 
-function resolveTier() {
-  const t = app.settings.graphics.tier;
-  if (t !== 'auto') return t;
-  // mechanism-backed auto tier: cores + memory + DPR
-  const cores = navigator.hardwareConcurrency || 4;
-  const mem = navigator.deviceMemory || 4;
-  const mobile = matchMedia('(pointer: coarse)').matches;
-  if (mobile && (cores <= 4 || mem <= 3)) return 'low';
-  if (cores >= 8 && mem >= 8) return 'high';
-  return mobile ? 'low' : 'medium';
-}
 
 const DEFAULT_BINDINGS = {
   confirm: ['Space', 'Enter'], cancel: ['Escape'], pause: ['Escape', 'KeyP'],
@@ -269,8 +260,7 @@ function buildSettingsBody(tab) {
   }
 
   if (tab === 'graphics') {
-    body.append(segField('Quality tier', ['auto', 'low', 'medium', 'high'], s.graphics.tier, (v) => { s.graphics.tier = v; save(); },
-      'Auto picks from device capability. Tiers change shadows, particles and render scale — never rules.'));
+    buildGraphicsFields(body, save);
     body.append(segField('Camera', ['auto', 'top', 'low'], s.camera.mode, (v) => { s.camera.mode = v; save(); }));
     body.append(segField('Theme', THEMES.map((t) => t.id), s.theme, (v) => {
       s.theme = v; save();
@@ -330,6 +320,104 @@ function buildSettingsBody(tab) {
     });
     body.append(consent);
   }
+}
+
+/**
+ * Graphics section: quality preset, render scale, one select per effect
+ * category ("From preset (…)" by default), adaptive resolution, frame-rate
+ * readout and a GPU/cost summary. Every change applies live and persists.
+ */
+function buildGraphicsFields(body, save) {
+  const L = gfxStrings();
+  const g = app.settings.graphics;
+  const info = () => app.renderer?.graphicsInfo?.() || null;
+  const tierName = (t) => L.tiers[t] || L.presets[t] || t;
+  const wrap = el('div', { class: 'gfx-section', id: 'gfx-section' });
+
+  const selectField = (id, label, options, value, onChange) => {
+    const f = el('div', { class: 'field gfx-field' });
+    f.append(el('label', { class: 'field-label', for: id, text: label }));
+    const sel = el('select', { id, 'data-gfx': id.replace(/^gfx-/, '') });
+    for (const [v, text] of options) {
+      const o = el('option', { value: v, text });
+      if (v === value) o.selected = true;
+      sel.append(o);
+    }
+    sel.addEventListener('change', () => onChange(sel.value));
+    f.append(sel);
+    return f;
+  };
+
+  const apply = () => { save(); refreshSummary(); };
+
+  const cur = info();
+  const detected = cur?.detected || 'balanced';
+  const activePreset = cur?.resolved?.preset || detected;
+  wrap.append(selectField('gfx-preset', L.quality,
+    [['auto', fmt(L.auto, { tier: L.presets[detected] })], ...PRESETS.map((p) => [p, L.presets[p]])],
+    PRESETS.includes(g.preset) ? g.preset : 'auto',
+    (v) => {
+      // choosing a preset clears per-category overrides
+      const next = choosePreset(g, v);
+      for (const k of Object.keys(g)) delete g[k];
+      Object.assign(g, next);
+      save();
+      const focusId = document.activeElement?.id;
+      buildSettingsBody('graphics');
+      if (focusId) document.getElementById(focusId)?.focus();
+    }));
+
+  // render scale 50–200 %
+  const scaleField = el('div', { class: 'field gfx-field' });
+  scaleField.append(el('label', { class: 'field-label', for: 'gfx-scale', text: L.renderScale }));
+  const pct = Math.round((Number(g.render_scale) || 1) * 100);
+  const srow = el('div', { class: 'gfx-slider' });
+  const slider = el('input', { type: 'range', id: 'gfx-scale', min: 50, max: 200, step: 5, value: pct, 'data-gfx': 'scale' });
+  const sval = el('output', { for: 'gfx-scale', id: 'gfx-scale-value', text: `${pct}%` });
+  slider.addEventListener('input', () => {
+    g.render_scale = Number(slider.value) / 100;
+    sval.textContent = `${slider.value}%`;
+    apply();
+  });
+  srow.append(slider, sval);
+  scaleField.append(srow);
+  wrap.append(scaleField);
+
+  // per-category overrides
+  const grid = el('div', { class: 'gfx-grid' });
+  for (const [cat, tiers] of Object.entries(CATEGORIES)) {
+    const presetValue = presetTier(activePreset, cat);
+    grid.append(selectField(`gfx-${cat}`, L.cats[cat],
+      [['preset', fmt(L.fromPreset, { tier: tierName(presetValue) })], ...tiers.map((t) => [t, tierName(t)])],
+      tiers.includes(g[cat]) ? g[cat] : 'preset',
+      (v) => { if (v === 'preset') delete g[cat]; else g[cat] = v; apply(); }));
+  }
+  wrap.append(grid);
+
+  const adaptive = checkField(L.adaptive, g.adaptive !== false, (v) => { g.adaptive = v; apply(); });
+  adaptive.querySelector('input').id = 'gfx-adaptive';
+  adaptive.querySelector('label').setAttribute('for', 'gfx-adaptive');
+  const fps = checkField(L.showFps, !!g.show_fps, (v) => { g.show_fps = v; apply(); });
+  fps.querySelector('input').id = 'gfx-fps';
+  fps.querySelector('label').setAttribute('for', 'gfx-fps');
+  wrap.append(adaptive, fps);
+
+  const summary = el('p', { class: 'gfx-summary', id: 'gfx-summary', role: 'status' });
+  const note = el('p', { class: 'gfx-note', id: 'gfx-post-note', text: L.postNote });
+  note.hidden = true;
+  wrap.append(summary, note, el('p', { class: 'hint', text: L.hint }));
+  body.append(wrap);
+
+  function refreshSummary() {
+    const i = info();
+    if (!i) { summary.textContent = ''; return; }
+    summary.textContent = `${i.gpu} · ${i.summary}`;
+    summary.dataset.preset = i.resolved?.preset || '';
+    note.hidden = !i.postFailed;
+  }
+  refreshSummary();
+  // pixel size / post status settle on the next frame
+  requestAnimationFrame(() => requestAnimationFrame(refreshSummary));
 }
 
 function checkField(label, value, onChange) {

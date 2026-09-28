@@ -46,7 +46,7 @@ async function boot() {
         const r = createRenderer($('#gl'), {
           theme: themeById(settings.theme),
           reducedMotion: settings.accessibility.reducedMotion,
-          quality: settings.graphics.tier === 'auto' ? 'medium' : settings.graphics.tier,
+          graphics: settings.graphics,
           palette: settings.accessibility.palette,
           onReady: () => resolve(r),
         });
