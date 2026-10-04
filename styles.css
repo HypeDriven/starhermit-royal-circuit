@@ -133,9 +133,12 @@ body {
 .mode-name { font-weight: 750; font-size: 17px; }
 .mode-sub { color: var(--muted); font-size: 13px; }
 .title-foot { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+#btn-signin { align-self: center; }
+#btn-signin[hidden], #chip-invite[hidden] { display: none; }
+.avatar-img { width: 1.4em; height: 1.4em; border-radius: 50%; vertical-align: middle; object-fit: cover; }
 
 /* ---------- setup ---------- */
-#screen-setup, #screen-journey, #screen-learn, #screen-challenge, #screen-hosted { overflow: auto; }
+#screen-setup, #screen-journey, #screen-learn, #screen-challenge { overflow: auto; }
 .setup-panel h2 { margin-top: 0; }
 .field { margin: 14px 0; }
 .field > label, .field-label { display: block; font-weight: 650; margin-bottom: 6px; }
@@ -340,18 +343,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); height: 44px; }
 .toast.error { border-color: var(--danger); }
 @keyframes toast-in { from { transform: translateX(30px); opacity: 0; } to { transform: none; opacity: 1; } }
 
-/* ---------- hosted lobby ---------- */
-.room-code { font-size: 34px; font-weight: 800; letter-spacing: .3em; color: var(--accent); text-align: center; }
-.roster { list-style: none; padding: 0; margin: 12px 0; }
-.roster li {
-  display: flex; justify-content: space-between; align-items: center;
-  background: rgba(255,255,255,.05); border-radius: 10px; padding: 10px 14px; margin: 6px 0;
-}
-.pill { border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 700; }
-.pill.on { background: rgba(94,207,138,.2); color: var(--ok); }
-.pill.off { background: rgba(224,90,78,.18); color: #ffb4ac; }
-.away-summary { background: rgba(232,176,75,.08); border: 1px solid rgba(232,176,75,.4); border-radius: 10px; padding: 10px 14px; margin: 10px 0; font-size: 13.5px; }
-
 /* ---------- accessibility variants ---------- */
 body.large-text { font-size: 120%; }
 body.large-text .panel { max-width: 640px; }
@@ -383,6 +374,7 @@ body.left-handed .float-picker { left: auto; right: calc(14px + var(--sar)); tra
   .float-picker { bottom: calc(92px + var(--sab)); }
   .float-picker button { position: static !important; }
   .title-grid { grid-template-columns: repeat(2, 1fr); }
+  .title-grid .mode-card:last-child:nth-child(odd) { grid-column: span 2; }
 }
 /* portrait mobile */
 @media (max-width: 700px) {

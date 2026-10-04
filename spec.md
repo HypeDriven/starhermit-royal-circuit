@@ -41,10 +41,10 @@ Win by bringing every token home; expose rule variants before room creation. Res
 
 - **Learn:** interactive lessons introduce one rule at a time and require the player to perform the action.
 - **Journey:** authored progression with gradually combined mechanics and periodic mastery stages.
-- **Daily:** one shared seed and ruleset per UTC day, synchronized to platform time.
+- **Daily:** one shared seed and ruleset per UTC day, from the device clock.
 - **Practice:** selectable difficulty, restart, undo where rules permit, and no effect on competitive rating.
 - **Challenge:** constrained goals such as move limits, speed targets, altered layouts, or restricted tools.
-- **Hosted play:** private invitations and appropriate public matching, with reconnect and authoritative results.
+- **Hosted play:** not offered in this build (the client never uses the dev server's room relay); a future version would use StarHermit realtime rooms with private invitations, reconnect and authoritative results.
 
 ### Difficulty and content generation
 
@@ -191,17 +191,19 @@ No module may mutate rules state except through a validated command. Rendering c
 
 ### Packaging and launch
 - Ship a browser distribution with `starhermit.txt` at its root, `name=Royal Circuit`, and `launch=index.html`. Keep source files, secrets, design documents, and source maps outside the uploaded distribution.
-- Read the game scope from the short-lived launch token (URL fragment `#game_token=`, stripped on read) rather than hard-coding a slug. Use same-origin `/api` routes when hosted, with `Authorization: Bearer` on every call; re-mint scoped tokens via `POST /api/v1/games/{slug}/launch-token` every 45 min. Query-token fallbacks are local-dev only. Never persist access or launch tokens in local storage.
-- Clock sync via `GET /api/v1/time` (round-trip-adjusted) is available on the game's own dev server only; the platform build keeps device time. Treat rate limits and structured `{"error":"..."}` responses as recoverable UI states.
+- All platform access goes through the canonical StarHermit SDK (`starhermit-sdk.js`, an unedited copy of `tools/starhermit-sdk.js`, loaded before the modules) wrapped by `src/platform.js`. `StarHermit.init()` runs first at boot: it reads the launch token from `#game_token=` or `#access_token=`, strips it, takes the slug from `game_scope`, keeps the token in memory and renews it. If renewal is refused the game drops to local play and the title offers sign-in again.
+- On `*.starhermit.com` without a token the title shows **Sign in with StarHermit**; it is hidden when signed in and when running locally. Standalone play on the platform host makes no network calls.
+- The game keeps device time everywhere. Without a launch token it makes no network request at all (no platform calls, no own-server `/api` or `/ws` calls; telemetry stays in memory).
 
 ### Identity, profile, presence, and preferences
-- Support guest practice locally, then offer account sign-in for durable progress. Use the account nickname (from `GET /api/v1/users/{id}/profile`) where identity is useful, honor profile privacy, and keep presence host-owned — the game sends no presence of its own.
-- Store accessibility, audio, graphics tier, tutorial completion, camera preference, and rules options through per-game settings. Declare desktop action bindings and read player overrides; touch mappings remain responsive UI controls.
-- Cloud-save progression as a versioned, checksummed document, mirrored to the platform cloud-save slot (`/api/v1/me/cloud-saves/{slug}`, zip+base64) when signed in; localStorage remains the offline cache and remote wins on conflict. Resolve conflicts by preserving both snapshots and asking the player when neither is a strict descendant. Never place credentials or private chat in saves.
+- Signed in, the title's profile chip shows the account nickname (`StarHermit.profile()`, "Player <id>" fallback) and avatar; guests keep the local name. Presence stays host-owned.
+- Audio, graphics, accessibility, camera, theme, tutorial and consent settings mirror to the per-game settings KV: applied from `getSettings()` at boot (platform wins over local values) and patched (changed groups only, debounced) on every change.
+- Keyboard actions are declared as `control.*` lines in `starhermit.txt` (Escape/P pause, Backspace cancels a selection); keydown is routed by `event.code` through the bindings from `StarHermit.loadBindings()`. Settings → Controls remaps an action (`setControl` when signed in, local otherwise) and resets to defaults (`resetControls`); help lists the effective keys. Touch and gamepad stay responsive game controls.
+- Progression is cloud-saved as the versioned, checksummed save document in the `game:<slug>` slot: `loadJSON()` remote-first at boot, `saveJSON()` debounced 2 s on every local persist, `flushSave(true)` on `pagehide`/hide, with a visible sync status. localStorage remains the offline cache and the remote copy wins. Never place credentials or private chat in saves.
 
 ### Discovery, activity, and social layer
 - Playtime/activity reporting belongs to the host shell; the game calls no activity endpoints of its own. Surface entitlement or catalog state only in host-owned chrome; the game itself must remain playable without promotional interruption.
-- Provide a compact friends panel for score comparison and invitations where appropriate. Respect presence visibility and do not expose a hidden or private profile through game UI.
+- When signed in, the title shows **Invite a friend**, which copies `StarHermit.inviteLink()` with a confirmation toast. Rooms are not available in this build (the client has no hosted mode), so there is no friends picker, session invite inbox or session chat.
 - Use friend invitations and the game-invite inbox for private sessions. Text chat belongs in a collapsible, moderated panel with block/report hooks, unread state, a 10-message-per-minute-aware composer, and no chat over critical controls.
 - Offer voice rooms only as an explicit opt-in after joining a compatible conversation. Default muted, expose speaking/mute indicators, and provide leave/report controls. Core rules must never require voice.
 
@@ -209,7 +211,7 @@ No module may mutate rules state except through a validated command. Rendering c
 - Declare a small static achievement set: first completion, mechanic mastery, a sustained streak, a difficult content milestone, and an accessibility-neutral long-term goal. Keys are stable, lowercase identifiers; unlocks are idempotent.
 - Provide global and friends-filtered boards for the primary metric plus a fair daily/weekly board. Include ruleset, content version, seed, assists, and duration with every submission; reject impossible or stale-version scores.
 - Competitive outcomes, rating changes, and achievement unlocks are server-authoritative. Never accept a client-supplied winner, score, hidden state, or elapsed time as truth.
-- Until authoritative board submission exists, records are kept on the player's own device and the boards screen must say so and present them as casual. Never claim validation the build does not perform. When hosted, the boards screen may additionally render the platform leaderboard read-only (`GET /api/v1/games/{slug}` → `GET /api/v1/leaderboards/{id}/entries`); clients never submit scores.
+- Until authoritative board submission exists, records are kept on the player's own device and the boards screen must say so and present them as casual. Never claim validation the build does not perform. When hosted, the boards screen also renders the platform leaderboard read-only (`StarHermit.getGame()`/`leaderboards()` → `leaderboardEntries()`); clients never submit scores.
 
 ### Sessions and transport
 - Use the shared Games API for invitations, nearest-rating matchmaking where competitive, practice sessions against deterministic AI where suitable, session summaries, deadlines, move submission, and replays.

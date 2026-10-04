@@ -9,9 +9,9 @@
 
 import { Platform } from './platform.js';
 import { createAudio } from './audio.js';
-import { init as initUI } from './ui.js';
+import { init as initUI, DEFAULT_BINDINGS } from './ui.js';
 import { themeById } from './content.js';
-import { loadSettings } from './save.js';
+import { loadSettings, storeSettings } from './save.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -31,6 +31,11 @@ async function boot() {
   // Host handshake: clock sync + launch scope; degrades to local when static.
   const platform = await new Platform().init();
   bootProgress(30, platform.hosted ? 'Signed in — your festival pass is active.' : 'Playing locally (no host).');
+  // Signed in: per-player settings and key bindings on StarHermit win over this device's copy.
+  if (await platform.applyPlatformSettings(settings)) storeSettings(settings);
+  const base = { ...DEFAULT_BINDINGS, ...(settings.input.bindings || {}) };
+  const effective = await platform.loadBindings(base);
+  const platformBindings = platform.hosted ? effective : null;
 
   // Audio is fully procedural; safe to construct before the first gesture.
   const audio = createAudio();
@@ -68,7 +73,7 @@ async function boot() {
   }
 
   bootProgress(88, 'Setting the tables…');
-  initUI({ platform, renderer, audio });
+  initUI({ platform, renderer, audio, platformBindings });
   bootProgress(100, 'Welcome to the festival.');
 }
 

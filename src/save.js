@@ -22,7 +22,7 @@ export function defaultSave() {
     dailies: {},              // 'YYYY-MM-DD' -> { score, won, turns, excluded? }
     achievements: {},         // key -> unlockedAt
     stats: { gamesPlayed: 0, gamesWon: 0, captures: 0, crowned: 0, streakDays: 0, lastDaily: null },
-    leaderboards: { daily: [], best: [] }, // local boards; hosted boards come from the server
+    leaderboards: { daily: [], best: [] }, // local boards; platform boards are read-only
     ratings: { circuit: 1000 },
   };
 }

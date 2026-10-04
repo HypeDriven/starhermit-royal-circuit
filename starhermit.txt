@@ -4,3 +4,14 @@ launch=index.html
 owner=2712e04e-461b-4d23-81ae-e40b429128a8
 server=server.js
 cover=cover.jpg
+
+# Keyboard actions (KeyboardEvent.code; remappable in Settings and via the platform controls API).
+control.confirm=Space+Enter | Roll / confirm
+control.cancel=Backspace | Cancel selection
+control.pause=Escape+KeyP | Pause
+control.undo=KeyU | Undo
+control.hint=KeyH | Hint
+control.camera=KeyC | Reset camera
+control.board=KeyB | Board state (text)
+control.next=ArrowRight+ArrowDown | Next float
+control.prev=ArrowLeft+ArrowUp | Previous float

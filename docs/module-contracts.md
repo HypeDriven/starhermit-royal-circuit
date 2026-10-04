@@ -60,3 +60,5 @@ Pure world-space math shared by render + DOM overlay: `circuitPos(cell)`,
 Static file server + `GET /api/v1/time` + WebSocket `/ws` rooms with authoritative
 rules via `src/rules.js`. Messages JSON: c→s `create|join|start|command|leave|list|ping`;
 s→c `room|begin|applied|rejected|presence|result|error|pong` (+ `replyTo` for RPC).
+The client no longer calls any of these routes (no hosted mode; device clock); they remain
+for the server's own tests.

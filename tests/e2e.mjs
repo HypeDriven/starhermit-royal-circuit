@@ -36,14 +36,10 @@
  *
  * Serving: the repo ships `server.js` (the StarHermit authoritative script
  * declared by starhermit.txt) but solo modes (journey/daily/practice/learn/
- * challenge) are fully playable offline — when /api/v1/time is unavailable
- * `src/platform.js` drops to `hosted=false` and every solo screen works
- * locally. So, per the sibling conventions (picture-logic/blockstead/
- * balance-spire), this test embeds a minimal node:http static server on an
- * ephemeral port and answers /api/* probes with 200 `{}` so the platform
- * adapter degrades to its documented offline path with zero console noise.
- * Hosted play (which genuinely needs server.js + /ws) is out of scope and is
- * not entered by this test.
+ * challenge) are fully playable offline and, without a launch token, the
+ * client makes no own-server request at all. This test embeds a minimal
+ * node:http static server on an ephemeral port and asserts it never sees an
+ * /api or /ws request.
  *
  * Run: npm run test:e2e  (or: node tests/e2e.mjs)
  */
@@ -77,17 +73,13 @@ const MIME = {
   '.txt': 'text/plain; charset=utf-8',
 };
 
+const ownServerCalls = [];
 const server = http.createServer(async (req, res) => {
   try {
     const p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
     const filePath = p === '/' ? path.join(ROOT, 'index.html') : path.join(ROOT, p);
-    // No StarHermit backend here: answer API probes with empty JSON (200) so
-    // the platform adapter degrades to offline mode without console noise.
-    if (p.startsWith('/api/')) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end('{}');
-      return;
-    }
+    // Standalone the game must never call its own server.
+    if (/^\/(api|ws)(\/|$)/.test(p)) ownServerCalls.push(p);
     if (!filePath.startsWith(ROOT)) { res.writeHead(403).end('forbidden'); return; }
     const data = await readFile(filePath);
     res.writeHead(200, { 'Content-Type': MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream' });
@@ -291,12 +283,12 @@ async function runPass(browser, name, ctxOpts, { full }) {
   page.on('console', (m) => {
     if ((m.type() !== 'error' && m.type() !== 'warning') || browserNoise.test(m.text())) return;
     const url = m.location()?.url || '';
-    if (/Failed to load resource/.test(m.text()) && /\/api\/|\/favicon/.test(url)) return;
+    if (/Failed to load resource/.test(m.text()) && /\/favicon/.test(url)) return;
     errors.push(`console ${m.type()}: ${m.text()}`);
   });
   page.on('response', (r) => {
     const p = r.url();
-    if (r.status() >= 400 && !/\/api\/|\/favicon/.test(p)) errors.push(`http ${r.status()}: ${p}`);
+    if (r.status() >= 400 && !/\/favicon/.test(p)) errors.push(`http ${r.status()}: ${p}`);
   });
 
   try {
@@ -417,6 +409,8 @@ try {
   await runPass(browser, 'desktop', { viewport: { width: 1280, height: 800 } }, { full: true });
   await runPass(browser, 'mobile',
     { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true }, { full: false });
+  if (ownServerCalls.length) throw new Error('standalone made own-server requests: ' + ownServerCalls.join(', '));
+  console.log('ok - standalone load made zero same-origin /api or /ws requests');
   console.log('\nE2E PASS — royal-circuit, desktop + mobile, no page errors');
 } catch (e) {
   failures++;

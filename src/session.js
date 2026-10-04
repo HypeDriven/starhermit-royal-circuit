@@ -23,7 +23,7 @@ const HASH_EVERY = 10; // periodic state hashes in the replay envelope
 export class Session {
   /**
    * @param opts {
-   *   mode: 'learn'|'journey'|'daily'|'practice'|'challenge'|'hosted'|'local',
+   *   mode: 'learn'|'journey'|'daily'|'practice'|'challenge'|'local',
    *   ruleset, seed, players: [{name, kind, level?}],
    *   content?: content definition, lesson?: lesson def,
    *   ranked: bool, undoAllowed: bool,
@@ -231,7 +231,6 @@ export class Session {
   primarySeat() { return 0; } // human seats start at 0 in solo modes
 
   persistSnapshot() {
-    if (this.mode === 'hosted') return; // hosted snapshots come from the server
     storeSnapshot({
       mode: this.mode,
       contentId: this.content?.id || this.lesson?.id || null,

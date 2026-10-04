@@ -22,6 +22,7 @@ import {
 import { EVENT_CAPTIONS } from './audio.js';
 import { PRESETS, CATEGORIES, presetTier, choosePreset } from './gfx.js';
 import { gfxStrings, fmt } from './gfxstrings.js';
+import { shText } from './shstrings.js';
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
@@ -41,11 +42,10 @@ const app = {
   state: AppState.BOOT,
   platform: null, renderer: null, audio: null,
   save: null, settings: null,
-  session: null,           // Session or HostedSession
+  session: null,           // Session
   mode: null, content: null, lesson: null,
   inputLocked: false,
   replayMode: false,
-  hosted: null,            // hosted room context
   focusBeforeOverlay: null,
   keyMap: null,
   lessonStepIdx: 0,
@@ -103,6 +103,25 @@ function renderSyncStatus() {
   n.textContent = (p?.hosted && SYNC_LABELS[p.syncStatus]) || '';
 }
 
+/** StarHermit chrome on the title: sign-in when possible, invite link when signed in. */
+function renderAccount() {
+  const p = app.platform;
+  const signin = $('#btn-signin');
+  const invite = $('#chip-invite');
+  if (signin) signin.hidden = !!p?.hosted || !p?.canSignIn();
+  if (invite) invite.hidden = !p?.hosted;
+}
+async function copyInvite() {
+  const url = app.platform.inviteLink();
+  if (!url) return;
+  try {
+    await navigator.clipboard.writeText(url);
+    toast(shText('inviteCopied'));
+  } catch {
+    toast(shText('inviteLink', { url }), 'info', 8000);
+  }
+}
+
 /** Hosted boot: apply the remote save (remote wins) and account nickname. */
 async function applyPlatformIdentity() {
   const p = app.platform;
@@ -117,6 +136,10 @@ async function applyPlatformIdentity() {
     }
   } catch { /* keep the local cache */ }
   try { await p.fetchNickname(); } catch { /* fallback name already set */ }
+  p.avatarUrl().then((url) => {
+    const av = $('#profile-avatar');
+    if (url && av) { av.textContent = ''; av.append(el('img', { src: url, alt: '', class: 'avatar-img' })); }
+  });
   renderSyncStatus();
   if (app.state === AppState.TITLE || app.state === AppState.PROFILE) showTitle();
 }
@@ -183,7 +206,7 @@ function anyOverlayOpen() { return OVERLAYS.some((n) => !$(`#overlay-${n}`).hidd
 /* ------------------------------------------------------------------ */
 /* screens                                                             */
 /* ------------------------------------------------------------------ */
-const SCREENS = ['boot', 'title', 'setup', 'journey', 'learn', 'challenge', 'hosted', 'game'];
+const SCREENS = ['boot', 'title', 'setup', 'journey', 'learn', 'challenge', 'game'];
 
 function showScreen(name) {
   SCREENS.forEach((s) => $(`#screen-${s}`).classList.toggle('active', s === name));
@@ -218,21 +241,24 @@ function applySettings() {
 }
 
 
-const DEFAULT_BINDINGS = {
-  confirm: ['Space', 'Enter'], cancel: ['Escape'], pause: ['Escape', 'KeyP'],
+// Keyboard actions (KeyboardEvent.code); mirrored by control.* in starhermit.txt.
+// Each code belongs to exactly one action: Escape pauses, Backspace cancels.
+export const DEFAULT_BINDINGS = {
+  confirm: ['Space', 'Enter'], cancel: ['Backspace'], pause: ['Escape', 'KeyP'],
   undo: ['KeyU'], hint: ['KeyH'], camera: ['KeyC'], board: ['KeyB'],
   next: ['ArrowRight', 'ArrowDown'], prev: ['ArrowLeft', 'ArrowUp'],
 };
 
 function bindings() {
-  return { ...DEFAULT_BINDINGS, ...(app.settings.input.bindings || {}) };
+  // Signed in, the platform controls API wins (loaded at start, updated on remap).
+  return { ...DEFAULT_BINDINGS, ...(app.settings.input.bindings || {}), ...(app.platformBindings || {}) };
 }
 
 function buildSettingsBody(tab) {
   const body = $('#settings-body');
   body.innerHTML = '';
   const s = app.settings;
-  const save = () => { storeSettings(s); applySettings(); app.platform.track('settings_change', { tab }); };
+  const save = () => { storeSettings(s); applySettings(); app.platform.mirrorSettings(s); app.platform.track('settings_change', { tab }); };
 
   if (tab === 'audio') {
     for (const [bus, label] of [['music', 'Music'], ['effects', 'Effects'], ['ambience', 'Ambience'], ['voice', 'Voice cues']]) {
@@ -287,6 +313,8 @@ function buildSettingsBody(tab) {
           e.preventDefault();
           window.removeEventListener('keydown', once, true);
           s.input.bindings = { ...(s.input.bindings || {}), [action]: [e.code] };
+          if (app.platformBindings) app.platformBindings[action] = [e.code];
+          app.platform.setControl(action, [e.code]);
           save(); buildSettingsBody('controls');
         };
         window.addEventListener('keydown', once, true);
@@ -299,7 +327,12 @@ function buildSettingsBody(tab) {
     body.append(checkField('Left-handed controls', s.accessibility.leftHanded, (v) => { s.accessibility.leftHanded = v; save(); }));
     body.append(checkField('Hold to confirm (instead of toggle)', s.accessibility.holdToConfirm, (v) => { s.accessibility.holdToConfirm = v; save(); }));
     const reset = el('button', { class: 'btn ghost', text: 'Reset bindings to defaults' });
-    reset.addEventListener('click', () => { s.input.bindings = null; save(); buildSettingsBody('controls'); });
+    reset.addEventListener('click', () => {
+      s.input.bindings = null;
+      if (app.platformBindings) app.platformBindings = { ...DEFAULT_BINDINGS };
+      app.platform.resetControls();
+      save(); buildSettingsBody('controls');
+    });
     body.append(reset);
   }
 
@@ -469,14 +502,12 @@ function showTitle() {
   if (app.audio) { app.audio.setMusic('title'); }
   $('#profile-name').textContent = displayName();
   renderSyncStatus();
+  renderAccount();
   const done = Object.keys(app.save.journey).length;
   $('#journey-sub').textContent = done ? `${done}/40 stages complete` : '40 festival stages';
   const today = dailyForDate(new Date(app.platform.now()));
   const rec = app.save.dailies[today.date];
   $('#daily-sub').textContent = rec ? `Today: ${rec.won ? 'won' : 'played'} · score ${rec.score}` : 'One shared race each day';
-  if ($('#hosted-sub')) {
-    $('#hosted-sub').textContent = app.platform?.hosted ? 'Coming soon to this build' : 'Rooms with friends';
-  }
   // resume offer
   const snap = loadSnapshot();
   if (snap && snap.state && snap.state.phase !== 'over' && !app._resumeOffered) {
@@ -874,7 +905,7 @@ function unlock(key) {
 function updateProgression(results) {
   const s = app.save;
   const st = s.stats;
-  const mySeat = app.mode === 'hosted' ? (app.hosted?.seat ?? 0) : 0;
+  const mySeat = 0;
   st.gamesPlayed += 1;
   const me = results.rows.find((r) => r.seat === mySeat);
   const won = results.winner === mySeat;
@@ -981,8 +1012,7 @@ function enterGameScreen() {
     app.mode === 'daily' ? 'Daily Circuit' :
     app.mode === 'challenge' ? app.content.name :
     app.mode === 'learn' ? app.lesson.title :
-    app.mode === 'local' ? 'Local Table' :
-    app.mode === 'hosted' ? `Room ${app.hosted?.code ?? ''}` : 'Practice';
+    app.mode === 'local' ? 'Local Table' : 'Practice';
   announce('objective', obj);
   $('#lesson-coach').hidden = app.mode !== 'learn';
   if (app.mode === 'learn') showLessonStep();
@@ -1024,7 +1054,7 @@ function countdownThenBegin() {
 
 function currentName() {
   const p = app.session.currentPlayer;
-  return p.kind === 'ai' ? p.name : (p.seat === 0 || app.mode === 'hosted' ? p.name : p.name);
+  return p.name;
 }
 
 /* ----- central event fan-out (session → audio/render/hud) ----- */
@@ -1032,7 +1062,7 @@ function onSessionEvent(events, state) {
   app._lastEvents = events;
   for (const e of events) {
     const sfx = { roll: 'roll', move: 'move', deploy: 'deploy', capture: 'capture', crown: 'crown', encore: 'encore', overkindled: 'overkindled', pass: 'pass', turn: 'turn', resign: 'lose', gameover: null, undo: 'undo' }[e.t];
-    const mySeat = app.mode === 'hosted' ? (app.hosted?.seat ?? 0) : 0;
+    const mySeat = 0;
     if (e.t === 'gameover') sfxPlay(state.winner === mySeat ? 'win' : 'lose');
     else if (sfx) sfxPlay(sfx);
     if (e.t === 'capture' && e.seat === mySeat) app.capturedThisGame += 1;
@@ -1070,8 +1100,7 @@ function updateFlow() {
   const acts = s.actions;
   const cur = s.currentPlayer;
   const isHuman = cur.kind !== 'ai';
-  const myTurnHosted = app.mode !== 'hosted' || s.state.turnIndex === app.hosted?.seat;
-  const canAct = isHuman && myTurnHosted && !app.inputLocked && !app.replayMode;
+  const canAct = isHuman && !app.inputLocked && !app.replayMode;
 
   // turn banner + live region
   const turnText = acts.type === 'roll'
@@ -1270,7 +1299,7 @@ function syncAll() {
 
 function updateHUD(state) {
   updateHudPlayers(state);
-  const me = state.players[app.mode === 'hosted' ? (app.hosted?.seat ?? 0) : 0];
+  const me = state.players[0];
   announce('score', `${me.name}: ${me.crowned} crowned, ${me.captures} captures.`);
   const ul = $('#rail-progress');
   ul.innerHTML = '';
@@ -1392,7 +1421,7 @@ function showResults(lessonOnly = false) {
 
   const body = $('#results-body');
   body.innerHTML = '';
-  const mySeat = app.mode === 'hosted' ? (app.hosted?.seat ?? 0) : 0;
+  const mySeat = 0;
   const won = results.winner === mySeat;
   const goal = s.goalStatus();
 
@@ -1467,8 +1496,8 @@ function showResults(lessonOnly = false) {
     nextBtn.onclick = () => { hideOverlay('results'); leaveToTitle(); };
   }
   $('#results-retry').onclick = () => { hideOverlay('results'); retryCurrent(); };
-  $('#results-retry').style.display = app.mode === 'hosted' ? 'none' : '';
-  $('#results-replay').style.display = (lessonOnly || app.mode === 'hosted') ? 'none' : '';
+  $('#results-retry').style.display = '';
+  $('#results-replay').style.display = lessonOnly ? 'none' : '';
   $('#results-replay').onclick = () => { hideOverlay('results'); watchReplay(); };
 
   announce('results', `${won ? 'Victory' : 'Game over'}. ${sub || ''}`);
@@ -1489,8 +1518,6 @@ function retryCurrent() {
 function leaveToTitle() {
   app.session?.cancelPending();
   app.session = null;
-  app.hosted = null;
-  app.platform.disconnect();
   if (app.audio) { app.audio.setMusic('title'); }
   showTitle();
 }
@@ -1579,7 +1606,7 @@ function resumeGame() {
 }
 
 async function restartGame() {
-  if (app.mode === 'hosted' || !app.lastGameOpts) return;
+  if (!app.lastGameOpts) return;
   $('#overlay-pause').hidden = true; // stay paused while the prompt is open
   if (await confirmDialog('Restart this match from the beginning?')) {
     startGame({ ...app.lastGameOpts });
@@ -1590,13 +1617,6 @@ async function restartGame() {
 
 async function leaveGame() {
   $('#overlay-pause').hidden = true; // stay paused while the prompt is open
-  if (app.mode === 'hosted') {
-    if (await confirmDialog('Leave the room? Your seat is held for a reconnect while the room lives.')) {
-      if (app.hosted?.code) app.platform.leaveRoom(app.hosted.code);
-      leaveToTitle();
-    } else showOverlay('pause');
-    return;
-  }
   const inProgress = app.session && !app.session.isOver;
   if (!inProgress || await confirmDialog('Leave the game? Solo progress is saved and can be resumed.')) {
     leaveToTitle();
@@ -1604,8 +1624,8 @@ async function leaveGame() {
 }
 
 function onVisibility() {
-  if (document.hidden && app.state === AppState.ACTIVE && app.mode !== 'hosted') {
-    pauseGame('background'); // solo simulation pauses; hosted truth lives on the server
+  if (document.hidden && app.state === AppState.ACTIVE) {
+    pauseGame('background'); // solo simulation pauses
   }
 }
 
@@ -1762,288 +1782,6 @@ function pollGamepad() {
 }
 
 /* ------------------------------------------------------------------ */
-/* hosted play: lobby + server-authoritative session                    */
-/* ------------------------------------------------------------------ */
-class HostedSession {
-  constructor({ code, seat, snapshot }) {
-    this.mode = 'hosted';
-    this.content = null;
-    this.lesson = null;
-    this.ranked = false;
-    this.undoAllowed = false;
-    this.history = [];
-    this.paused = false;
-    this.code = code;
-    this.seat = seat;
-    this.state = snapshot;
-    this.startedAt = Date.now();
-    this.endedAt = null;
-    this.pendingTimer = null;
-    this.envelope = null; // hosted replays come from the server log, not a local envelope
-  }
-  get snapshot() { return this.state; }
-  get actions() { return legalActions(this.state); }
-  get currentPlayer() { return this.state.players[this.state.turnIndex]; }
-  get isOver() { return this.state.phase === 'over'; }
-
-  /** The server is the only writer of shared state; commands are optimistic. */
-  command(type, extra = {}) {
-    const cmd = {
-      id: `h:${this.state.tick}:${type}:${Math.random().toString(36).slice(2, 10)}`,
-      tick: this.state.tick,
-      type,
-    };
-    if (extra.floatId !== undefined) cmd.floatId = extra.floatId;
-    app.platform.sendCommand(this.code, cmd).then((rep) => {
-      if (!rep || rep.t !== 'rejected') return;
-      if (rep.snapshot) this.applySnapshot(rep.snapshot, []); // stale-tick resync
-      rejectFeedback({ error: rep.error });
-    });
-    return { ok: true };
-  }
-
-  applySnapshot(state, events) {
-    this.state = state;
-    if (this.isOver && !this.endedAt) this.endedAt = Date.now();
-    onSessionEvent(events || [], state);
-  }
-
-  undo() { return false; }
-  async driveAI() { /* every hosted seat is human; nothing to drive */ }
-  cancelPending() { /* no local timers */ }
-  hint() {
-    const acts = this.actions;
-    if (acts.type !== 'moves') return null;
-    return hintMove(this.state, acts.moves, this.state.turnIndex);
-  }
-  elapsedMs() { return (this.endedAt || Date.now()) - this.startedAt; }
-  results() {
-    const ranked = rankPlayers(this.state);
-    return {
-      mode: 'hosted',
-      contentId: null,
-      winner: this.state.winner,
-      reason: this.state.reason,
-      turns: this.state.turnsPlayed,
-      elapsedMs: this.elapsedMs(),
-      rows: ranked.map((pl, i) => ({
-        place: i + 1, seat: pl.seat, name: pl.name, kind: pl.kind,
-        breakdown: scoreBreakdown(this.state, pl.seat),
-        crowned: pl.crowned, captures: pl.captures, invalid: pl.invalid,
-        resigned: pl.resigned,
-      })),
-      ranked: false,
-      seed: 'server',
-    };
-  }
-  goalStatus() { return { met: this.isOver && this.state.winner === this.seat, label: null }; }
-}
-
-function showHosted() {
-  setState(AppState.MODE_SELECT, 'hosted-lobby');
-  showScreen('hosted');
-  renderHostedHome();
-}
-
-async function renderHostedHome(note = '') {
-  const body = $('#hosted-body');
-  body.innerHTML = '';
-  if (app.platform.hosted) {
-    // On-platform rooms are not migrated yet: the old own-server relay does not
-    // exist here, so the entry point is disabled honestly instead of failing.
-    body.append(el('p', { class: 'muted', text: 'Rooms with friends, run by an authoritative host.' }));
-    body.append(el('div', { class: 'summary-card', html: '<b>Not available yet.</b> Online rooms on this platform build are still being migrated from the old host relay. Every solo mode — journey, daily, practice, lessons, challenges — is fully playable.' }));
-    return;
-  }
-  body.append(el('p', { class: 'muted', text: 'Rooms run on this host: the server owns the dice, the rules and the results.' }));
-  const status = el('p', { class: 'muted', text: note || 'Connecting…' });
-  body.append(status);
-  const ok = await app.platform.connect();
-  if (app.hosted) return; // a room was joined while connecting
-  if (!ok) {
-    status.remove();
-    body.append(el('div', { class: 'summary-card', html: '<b>Offline.</b> Hosted play needs the game server; this copy is served statically. Every solo mode works offline.' }));
-    return;
-  }
-  status.textContent = note;
-
-  // create form
-  const cfg = { seats: 2, privacy: 'private' };
-  const createCard = el('div', { class: 'summary-card' });
-  createCard.append(el('h3', { text: 'Create a room' }));
-  createCard.append(segField('Seats', [2, 3, 4], cfg.seats, (v) => { cfg.seats = v; }));
-  createCard.append(segField('Privacy', ['private', 'public'], cfg.privacy, (v) => { cfg.privacy = v; }));
-  const createBtn = el('button', { class: 'btn primary', text: 'Create room' });
-  createBtn.addEventListener('click', async () => {
-    createBtn.disabled = true;
-    const rep = await app.platform.createRoom({ name: displayName(), seats: cfg.seats, privacy: cfg.privacy });
-    createBtn.disabled = false;
-    if (rep.t !== 'room') { toast(`Could not create room (${rep.error || 'error'}).`, 'error'); return; }
-    enterLobby(rep);
-  });
-  createCard.append(createBtn);
-  body.append(createCard);
-
-  // join by code
-  const joinCard = el('div', { class: 'summary-card' });
-  joinCard.append(el('h3', { text: 'Join with a code' }));
-  const row = el('div', { class: 'row' });
-  const input = el('input', { type: 'text', maxlength: 4, placeholder: 'CODE', 'aria-label': 'Room code', style: 'text-transform:uppercase;width:7em' });
-  const joinBtn = el('button', { class: 'btn', text: 'Join' });
-  const doJoin = () => joinRoomByCode(input.value);
-  joinBtn.addEventListener('click', doJoin);
-  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') doJoin(); });
-  row.append(input, joinBtn);
-  joinCard.append(row);
-  body.append(joinCard);
-
-  // public rooms
-  const pubCard = el('div', { class: 'summary-card' });
-  pubCard.append(el('h3', { text: 'Public rooms' }));
-  const listBox = el('div', {});
-  const refresh = el('button', { class: 'btn ghost', text: 'Refresh list' });
-  refresh.addEventListener('click', async () => {
-    listBox.innerHTML = '';
-    const rep = await app.platform.listPublic();
-    const rooms = rep.rooms || [];
-    if (!rooms.length) { listBox.append(el('p', { class: 'muted', text: 'No open public rooms right now.' })); return; }
-    for (const r of rooms) {
-      const line = el('div', { class: 'row between' });
-      const jb = el('button', { class: 'btn', text: 'Join' });
-      jb.addEventListener('click', () => joinRoomByCode(r.code));
-      line.append(el('span', { text: `${r.code} · ${r.players}/${r.seats} players` }), jb);
-      listBox.append(line);
-    }
-  });
-  pubCard.append(listBox, refresh);
-  body.append(pubCard);
-  refresh.click();
-}
-
-async function joinRoomByCode(code) {
-  code = String(code || '').trim().toUpperCase();
-  if (!/^[A-Z2-9]{4}$/.test(code)) { toast('Room codes are 4 letters/digits.', 'error'); return; }
-  const rep = await app.platform.joinRoom(code, displayName());
-  if (rep.t !== 'room') { toast(`Could not join (${rep.error || 'error'}).`, 'error'); return; }
-  enterLobby(rep);
-}
-
-function enterLobby(rep) {
-  app.hosted = {
-    code: rep.room.code, seat: rep.you.seat, seatToken: rep.you.seatToken,
-    players: rep.room.players, hostSeat: rep.room.hostSeat, seats: rep.room.seats,
-  };
-  renderLobby();
-}
-
-function renderLobby() {
-  const h = app.hosted;
-  if (!h) return;
-  const body = $('#hosted-body');
-  body.innerHTML = '';
-  const codeLine = el('div', { class: 'summary-card' });
-  codeLine.innerHTML = `<b>Room code:</b> <span style="font-size:1.6em;letter-spacing:.2em">${escapeHtml(h.code)}</span><br>` +
-    `<span class="muted">Share the code with friends. Seats: ${h.seats}.</span>`;
-  body.append(codeLine);
-  const list = el('div', { class: 'card-list' });
-  (h.players || []).forEach((p) => {
-    const item = el('div', { class: 'card-item', role: 'listitem' });
-    item.append(
-      el('span', { class: 'ci-icon', text: p.connected ? '🏮' : '💤' }),
-      el('span', { class: 'ci-body' }),
-      el('span', { class: 'ci-meta', text: `${p.seat === h.hostSeat ? 'host' : ''}${p.seat === h.seat ? ' · you' : ''}` }),
-    );
-    item.querySelector('.ci-body').append(
-      el('div', { class: 'ci-title', text: p.name }),
-      el('div', { class: 'ci-sub', text: p.connected ? `Seat ${p.seat + 1} — ready` : 'disconnected' }),
-    );
-    list.append(item);
-  });
-  body.append(list);
-  const row = el('div', { class: 'row end' });
-  const leaveBtn = el('button', { class: 'btn ghost', text: 'Leave room' });
-  leaveBtn.addEventListener('click', async () => {
-    await app.platform.leaveRoom(h.code);
-    app.hosted = null;
-    renderHostedHome('Left the room.');
-  });
-  row.append(leaveBtn);
-  if (h.seat === h.hostSeat) {
-    const startBtn = el('button', { class: 'btn primary', text: 'Start game' });
-    startBtn.disabled = (h.players || []).length < h.seats;
-    startBtn.addEventListener('click', () => app.platform.startRoom(h.code));
-    row.append(startBtn);
-    if (startBtn.disabled) row.append(el('span', { class: 'muted', text: 'Waiting for every seat…' }));
-  } else {
-    row.append(el('span', { class: 'muted', text: 'The host starts the game.' }));
-  }
-  body.append(row);
-}
-
-function beginHosted(snapshot) {
-  if (!app.hosted) return;
-  app.session = new HostedSession({ code: app.hosted.code, seat: app.hosted.seat, snapshot });
-  app.mode = 'hosted';
-  app.content = null;
-  app.lesson = null;
-  app.capturedThisGame = 0;
-  app.replayMode = false;
-  setState(AppState.PREPARING, 'hosted-begin');
-  enterGameScreen();
-  if (app.audio) { app.audio.setMusic('tense'); app.audio.setAmbience(true); }
-  app.platform.track('start', { mode: 'hosted' });
-  syncAll();
-  countdownThenBegin();
-}
-
-async function onHostedClosed() {
-  if (!app.hosted) return;
-  if (app.state === AppState.MODE_SELECT) {
-    app.hosted = null;
-    renderHostedHome('Connection closed.');
-    return;
-  }
-  if (!(app.session instanceof HostedSession) || app.session.isOver || !app.hosted.seatToken) return;
-  setState(AppState.RECONNECTING, 'ws-closed');
-  banner('Reconnecting…', 2500);
-  toast('Connection lost — reconnecting…', 'error');
-  for (let attempt = 0; attempt < 3; attempt++) {
-    await new Promise((r) => setTimeout(r, 1200 * (attempt + 1)));
-    if (!app.hosted) return;
-    if (!await app.platform.connect()) continue;
-    const rep = await app.platform.joinRoom(app.hosted.code, displayName(), app.hosted.seatToken);
-    if (rep.t !== 'room') continue;
-    if (rep.snapshot && app.session) {
-      app.session.applySnapshot(rep.snapshot, []);
-      const away = rep.away?.events?.length || 0;
-      if (away) toast(`While you were away: ${away} event(s) played out.`);
-    }
-    setState(AppState.ACTIVE, 'reconnected');
-    syncAll();
-    toast('Reconnected.');
-    return;
-  }
-  toast('Could not reconnect to the room.', 'error');
-  leaveToTitle();
-}
-
-function bindPlatform() {
-  app.platform.on('presence', (msg) => {
-    if (!app.hosted) return;
-    app.hosted.players = msg.players;
-    app.hosted.hostSeat = msg.hostSeat;
-    if (app.state === AppState.MODE_SELECT && !$('#screen-hosted').classList.contains('active')) return;
-    if (app.state === AppState.MODE_SELECT) renderLobby();
-  });
-  app.platform.on('begin', (msg) => beginHosted(msg.snapshot));
-  app.platform.on('applied', (msg) => {
-    if (app.session instanceof HostedSession) app.session.applySnapshot(msg.snapshot, msg.events);
-  });
-  app.platform.on('result', (msg) => { if (app.hosted) app.hosted.results = msg.results; });
-  app.platform.on('closed', () => onHostedClosed());
-}
-
-/* ------------------------------------------------------------------ */
 /* DOM wiring                                                           */
 /* ------------------------------------------------------------------ */
 function openSettings(tab = 'audio') {
@@ -2064,7 +1802,6 @@ function bindTitle() {
     learn: showLearn,
     practice: () => showSetup('practice'),
     challenge: showChallenges,
-    hosted: showHosted,
   };
   $$('.mode-card').forEach((card) => {
     card.addEventListener('click', () => { app.audio?.event('ui'); modes[card.dataset.mode]?.(); });
@@ -2074,6 +1811,10 @@ function bindTitle() {
   $('#chip-leaderboards').addEventListener('click', () => showBoards('daily'));
   $('#chip-help').addEventListener('click', showHelp);
   $('#chip-settings').addEventListener('click', () => openSettings('audio'));
+  $('#btn-signin').textContent = shText('signIn');
+  $('#chip-invite').textContent = shText('invite');
+  $('#btn-signin').addEventListener('click', () => app.platform.signIn());
+  $('#chip-invite').addEventListener('click', copyInvite);
   $$('[data-nav="title"]').forEach((b) => b.addEventListener('click', showTitle));
 }
 
@@ -2132,7 +1873,7 @@ function bindOverlays() {
 /* ------------------------------------------------------------------ */
 /* init — the entry point bootstrap.js calls after capability detection */
 /* ------------------------------------------------------------------ */
-export function init({ platform, renderer, audio }) {
+export function init({ platform, renderer, audio, platformBindings }) {
   app.platform = platform;
   app.renderer = renderer;
   app.audio = audio;
@@ -2140,11 +1881,16 @@ export function init({ platform, renderer, audio }) {
   app.settings = loadSettings();
   platform.setConsent(app.settings.consent.analytics);
 
+  app.platformBindings = platformBindings || null;
+  platform.onAuthChange = (signedIn) => {
+    if (!signedIn) { app.platformBindings = null; toast(shText('signedOut')); }
+    if (app.state === AppState.TITLE || app.state === AppState.PROFILE) showTitle();
+  };
+
   bindTitle();
   bindHud();
   bindOverlays();
   bindCanvasInput();
-  bindPlatform();
 
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('resize', () => app.renderer?.resize());

@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="styles.css">
   <link rel="apple-touch-icon" href="./icon.png">
 <script src="browser-guard.js"></script>
+<script src="starhermit-sdk.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#action-tray">Skip to game controls</a>
@@ -74,19 +75,16 @@
             <span class="mode-name">Challenges</span>
             <span class="mode-sub">Constrained goals</span>
           </button>
-          <button class="mode-card" data-mode="hosted" id="card-hosted">
-            <span class="mode-icon" aria-hidden="true">🏮</span>
-            <span class="mode-name">Hosted Play</span>
-            <span class="mode-sub" id="hosted-sub">Rooms with friends</span>
-          </button>
         </nav>
         <footer class="title-foot">
-          <button class="chip" id="chip-profile" aria-label="Profile"><span aria-hidden="true">🏮</span> <span id="profile-name">Guest Envoy</span> <span id="sync-status" class="sync-status" role="status"></span></button>
+          <button class="chip" id="chip-profile" aria-label="Profile"><span aria-hidden="true" id="profile-avatar">🏮</span> <span id="profile-name">Guest Envoy</span> <span id="sync-status" class="sync-status" role="status"></span></button>
           <button class="chip" id="chip-achievements">Achievements</button>
           <button class="chip" id="chip-leaderboards">Leaderboards</button>
           <button class="chip" id="chip-help">How to Play</button>
           <button class="chip" id="chip-settings">Settings</button>
+          <button class="chip" id="chip-invite" hidden>Invite a friend</button>
         </footer>
+        <button class="btn" id="btn-signin" hidden>Sign in with StarHermit</button>
       </div>
     </section>
 
@@ -133,17 +131,6 @@
           <button class="btn ghost" data-nav="title">Back</button>
         </div>
         <div id="challenge-list" class="card-list" role="list"></div>
-      </div>
-    </section>
-
-    <!-- ======================= HOSTED LOBBY ======================= -->
-    <section id="screen-hosted" class="screen" aria-labelledby="hosted-h">
-      <div class="panel wide">
-        <div class="row between">
-          <h2 id="hosted-h">Hosted Play</h2>
-          <button class="btn ghost" data-nav="title">Back</button>
-        </div>
-        <div id="hosted-body"></div>
       </div>
     </section>
 
