@@ -75,7 +75,7 @@ The Three.js canvas fills the game region but is never the only UI. Menus, text,
 - **Wide desktop (≥1024 CSS px):** centered playfield, objective/progression rail on the left, contextual actions and social/status rail on the right. Maximum line length is 70 characters.
 - **Compact desktop/tablet:** playfield remains central; secondary rails collapse into drawers. Pointer hover may preview but never be required.
 - **Portrait mobile:** top safe-area status bar, square or perspective-fit playfield, bottom thumb-zone action tray, and sheet-based secondary panels. Never place critical controls under browser chrome or display cutouts.
-- **Landscape mobile:** reserve a narrow status rail; preserve at least 44×44 CSS-pixel targets and 8-pixel separation.
+- **Landscape mobile:** reserve a narrow status rail; preserve at least 44×44 CSS-pixel targets and 8-pixel separation. The title scrolls when taller than the screen but never clips its heading (safe centering); its head is compact so Play sits on the first screen. Overlays open at their top (focus moves in with `preventScroll`).
 - React to resize, orientation, device-pixel-ratio, safe-area insets, virtual keyboard, and visibility changes without losing input or restarting the round.
 - **Large screens (above 1600×1000):** the shared `ui-scale.js` sets `--ui-scale` (`min(w/1600, h/1000)`, capped at 2.5) and every DOM layer — screens, HUD, rails, action tray, float picker, overlays and toasts — is CSS-zoomed by it, so the UI keeps its 1600×1000 proportions; the full-viewport board canvas is not zoomed. Nothing changes at 1600×1000 and below.
 

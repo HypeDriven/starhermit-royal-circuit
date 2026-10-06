@@ -171,7 +171,10 @@ function showOverlay(name) {
   const ov = $(`#overlay-${name}`);
   ov.hidden = false;
   const focusable = ov.querySelector('button, [href], input, select, [tabindex]');
-  if (focusable) focusable.focus();
+  // preventScroll + reset: a low first control must not scroll the heading
+  // away; overlays always open at their top.
+  if (focusable) focusable.focus({ preventScroll: true });
+  for (const n of [ov, ...ov.querySelectorAll('*')]) if (n.scrollTop) n.scrollTop = 0;
   ov.onkeydown = (e) => {
     if (e.key === 'Escape') { e.stopPropagation(); hideOverlay(name); }
     if (e.key !== 'Tab') return;

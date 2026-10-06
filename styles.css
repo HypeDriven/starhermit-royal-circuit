@@ -114,8 +114,8 @@ body {
 .progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #b97f2a, var(--accent)); transition: width .25s; }
 
 /* ---------- title ---------- */
-#screen-title { align-items: center; justify-content: center; overflow: auto; }
-.title-wrap { display: flex; flex-direction: column; align-items: center; gap: 18px; max-width: 760px; width: 100%; margin: auto; }
+#screen-title { align-items: center; justify-content: safe center; overflow: auto; }
+.title-wrap { display: flex; flex-direction: column; align-items: center; gap: 18px; max-width: 760px; width: 100%; margin: auto; flex-shrink: 0; }
 .title-head { text-align: center; }
 .tagline { color: var(--muted); max-width: 46ch; margin: 0 auto; text-shadow: 0 1px 3px rgba(0,0,0,.9), 0 0 12px rgba(0,0,0,.7); }
 .btn-play {
@@ -407,6 +407,11 @@ body.left-handed .float-picker { left: auto; right: calc(14px + var(--sar)); tra
   .rail { bottom: calc(64px + var(--sab)); max-height: calc(56vh / var(--ui-scale, 1)); }
   .turn-banner { top: calc(56px + var(--sat)); padding: 5px 16px; font-size: 13px; }
   .caption-line { bottom: calc(70px + var(--sab)); }
+  /* title: compact head so Play and the first mode cards share the first screen */
+  #screen-title .logo-mark.big { font-size: 40px; }
+  #screen-title .title-wrap { gap: 10px; }
+  #screen-title .game-title { margin: 0; }
+  #screen-title .btn-play { padding: 12px 56px; }
 }
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: .001s !important; transition-duration: .001s !important; }
