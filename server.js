@@ -144,6 +144,10 @@ function serveStatic(req, res, pathname) {
     rel === 'favicon.ico' ||
     rel === 'favicon.svg' ||
     rel === 'icon.png' ||
+    rel === 'favicon.png' ||
+    rel === 'ui-scale.js' ||
+    rel === 'browser-guard.js' ||
+    rel === 'starhermit-sdk.js' ||
     /^(src|vendor|docs|assets|sfx)\//.test(rel);
   if (!allowed) return sendJson(res, 404, { error: 'not-found' });
 

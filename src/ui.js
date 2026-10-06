@@ -893,11 +893,14 @@ function showHelp() {
 /* ------------------------------------------------------------------ */
 /* progression + achievements (idempotent unlocks)                     */
 /* ------------------------------------------------------------------ */
+// Set while the results panel computes progression: it lists the new unlocks itself, so a
+// toast on top would only cover its heading and table (phones).
+let unlocksListedInResults = false;
 function unlock(key) {
   if (app.save.achievements[key]) return false; // idempotent
   app.save.achievements[key] = new Date().toISOString();
   const def = ACHIEVEMENTS.find((a) => a.key === key);
-  toast(`Achievement unlocked: ${def?.name || key}`, 'info', 5000);
+  if (!unlocksListedInResults) toast(`Achievement unlocked: ${def?.name || key}`, 'info', 5000);
   app.audio?.event('crown');
   return true;
 }
@@ -1188,17 +1191,20 @@ function positionPicker() {
   const seat = state.turnIndex;
   const buttons = [...pk.querySelectorAll('button')];
   const cr = pk.getBoundingClientRect();
+  // Projections and rects are visual px; the picker lives in the zoomed #app (large screens),
+  // so sizes/margins are scaled by k and the final offsets divided by it.
+  const k = window.UIScale?.value || 1;
   const placed = [];
   for (const b of buttons) {
     const fid = Number(b.dataset.float);
     const p = state.players[seat].floats[fid];
     const pos = floatPos(state.ruleset, seat, p < 0 ? fid : p, fid, 1);
     const scr = app.renderer.projectToScreen(pos);
-    const inView = scr.visible && scr.x > 8 && scr.x < window.innerWidth - 8 && scr.y > 60 && scr.y < window.innerHeight - 120;
+    const inView = scr.visible && scr.x > 8 * k && scr.x < window.innerWidth - 8 * k && scr.y > 60 * k && scr.y < window.innerHeight - 120 * k;
     if (!inView) { placed.length = 0; break; }
-    const w = b.offsetWidth, h = b.offsetHeight;
-    const x = Math.min(window.innerWidth - w - 8, Math.max(8, scr.x - w / 2));
-    const y = Math.min(window.innerHeight - 100, Math.max(60, scr.y - 52));
+    const w = b.offsetWidth * k, h = b.offsetHeight * k;
+    const x = Math.min(window.innerWidth - w - 8 * k, Math.max(8 * k, scr.x - w / 2));
+    const y = Math.min(window.innerHeight - 100 * k, Math.max(60 * k, scr.y - 52 * k));
     placed.push({ b, x, y, w, h });
   }
   // Floats sharing a tile (e.g. all four waiting on the start tile) would
@@ -1214,8 +1220,8 @@ function positionPicker() {
   // turn `fixed` into an offset, misplaced box).
   for (const { b, x, y } of placed) {
     b.style.position = 'absolute';
-    b.style.left = `${Math.round(x - cr.left)}px`;
-    b.style.top = `${Math.round(y - cr.top)}px`;
+    b.style.left = `${Math.round((x - cr.left) / k)}px`;
+    b.style.top = `${Math.round((y - cr.top) / k)}px`;
   }
 }
 
@@ -1415,7 +1421,8 @@ function showResults(lessonOnly = false) {
   // a second call would double-count stats, achievements and board entries.
   if (!app.replayMode && !s.progressionApplied) {
     s.progressionApplied = true;
-    updateProgression(results);
+    unlocksListedInResults = true;
+    try { updateProgression(results); } finally { unlocksListedInResults = false; }
   }
   const newAch = Object.keys(app.save.achievements).filter((k) => !before.has(k));
 

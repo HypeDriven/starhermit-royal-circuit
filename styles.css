@@ -42,6 +42,9 @@ body {
 
 /* ---------- generic ---------- */
 #app { position: fixed; inset: 0; pointer-events: none; }
+/* Large screens: ui-scale.js sets --ui-scale (exactly 1 up to 1600x1000). Every DOM layer is
+   zoomed by it (vw/vh inside them are divided); the full-viewport #gl canvas is not. */
+#app, #overlay-root, #toast-root, #fps-meter, #gl-fallback, .skip-link { zoom: var(--ui-scale, 1); }
 .screen {
   position: absolute; inset: 0; display: none; pointer-events: auto;
   padding: calc(16px + var(--sat)) calc(16px + var(--sar)) calc(16px + var(--sab)) calc(16px + var(--sal));
@@ -98,11 +101,11 @@ body {
 
 /* ---------- boot ---------- */
 #screen-boot { align-items: center; justify-content: center; background: radial-gradient(ellipse at 50% 35%, #241a4a 0%, var(--bg) 70%); }
-.boot-box { text-align: center; width: min(420px, 86vw); }
+.boot-box { text-align: center; width: min(420px, calc(86vw / var(--ui-scale, 1))); }
 .logo-mark { font-size: 54px; filter: drop-shadow(0 0 22px rgba(255,170,60,.55)); }
 .logo-mark.big { font-size: 72px; }
 .game-title {
-  font-size: clamp(34px, 6vw, 58px); margin: 8px 0 4px; letter-spacing: .04em;
+  font-size: clamp(34px, calc(6vw / var(--ui-scale, 1)), 58px); margin: 8px 0 4px; letter-spacing: .04em;
   background: linear-gradient(180deg, #ffe9b8, var(--accent) 65%, #b97f2a);
   -webkit-background-clip: text; background-clip: text; color: transparent;
   text-shadow: 0 2px 24px rgba(232,176,75,.25);
@@ -116,7 +119,7 @@ body {
 .title-head { text-align: center; }
 .tagline { color: var(--muted); max-width: 46ch; margin: 0 auto; text-shadow: 0 1px 3px rgba(0,0,0,.9), 0 0 12px rgba(0,0,0,.7); }
 .btn-play {
-  font-size: clamp(20px, 3vw, 28px); padding: 18px 66px; border-radius: 999px;
+  font-size: clamp(20px, calc(3vw / var(--ui-scale, 1)), 28px); padding: 18px 66px; border-radius: 999px;
   background: linear-gradient(180deg, #ffd98a, var(--accent)); color: #241703; border: none;
   box-shadow: 0 10px 40px rgba(232,176,75,.4); font-weight: 800; letter-spacing: .03em;
 }
@@ -218,7 +221,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); height: 44px; }
   position: absolute; top: calc(76px + var(--sat)); left: 50%; transform: translateX(-50%);
   background: rgba(20,14,40,.85); border: 1px solid rgba(232,176,75,.35); border-radius: 999px;
   padding: 8px 22px; font-weight: 700; opacity: 0; transition: opacity .25s; pointer-events: none;
-  max-width: min(92vw, 560px); text-align: center;
+  max-width: min(calc(92vw / var(--ui-scale, 1)), 560px); text-align: center;
 }
 .turn-banner.show { opacity: 1; }
 .caption-line {
@@ -258,17 +261,17 @@ input[type="range"] { width: 100%; accent-color: var(--accent); height: 44px; }
 .float-picker {
   position: absolute; left: 50%; transform: translateX(-50%);
   bottom: calc(92px + var(--sab)); display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
-  max-width: 92vw;
+  max-width: calc(92vw / var(--ui-scale, 1));
 }
 .float-picker button {
   font: inherit; color: var(--text); cursor: pointer; border-radius: 12px;
   background: rgba(20,14,40,.88); border: 2px solid var(--accent); padding: 10px 14px;
-  min-height: 44px; font-weight: 650;
+  min-height: 44px; font-weight: 650; white-space: nowrap; /* absolute (floating) buttons must not shrink to the empty container */
 }
 .lesson-coach {
   position: absolute; top: calc(120px + var(--sat)); left: 50%; transform: translateX(-50%);
   background: rgba(35,26,8,.92); border: 1px solid var(--accent); border-radius: 12px;
-  padding: 12px 20px; max-width: min(92vw, 520px); text-align: center; font-size: 15px;
+  padding: 12px 20px; max-width: min(calc(92vw / var(--ui-scale, 1)), 520px); text-align: center; font-size: 15px;
   box-shadow: 0 8px 30px rgba(0,0,0,.5);
 }
 
@@ -327,7 +330,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); height: 44px; }
   border: 1px solid rgba(255,255,255,.2); font-size: 12.5px;
 }
 
-.board-mirror { font-size: 14px; line-height: 1.5; max-height: 60vh; overflow: auto; }
+.board-mirror { font-size: 14px; line-height: 1.5; max-height: calc(60vh / var(--ui-scale, 1)); overflow: auto; }
 .board-mirror h4 { color: var(--accent); margin: 10px 0 4px; }
 .board-mirror ul { margin: 4px 0; padding-left: 20px; }
 
@@ -364,7 +367,7 @@ body.left-handed .float-picker { left: auto; right: calc(14px + var(--sar)); tra
    never sit over the board or intercept float taps */
 @media (max-width: 1023px) {
   .rail { position: absolute; top: auto; bottom: calc(86px + var(--sab)); transform: none;
-    max-height: 44vh; overflow: auto; width: min(300px, 78vw); z-index: 5; display: none; }
+    max-height: calc(44vh / var(--ui-scale, 1)); overflow: auto; width: min(300px, calc(78vw / var(--ui-scale, 1))); z-index: 5; display: none; }
   .rail.open { display: block; }
   .rail-left { left: calc(10px + var(--sal)); }
   .rail-right { right: calc(10px + var(--sar)); }
@@ -378,16 +381,20 @@ body.left-handed .float-picker { left: auto; right: calc(14px + var(--sar)); tra
 }
 /* portrait mobile */
 @media (max-width: 700px) {
-  .hud-objective { max-width: 46vw; padding: 6px 10px; }
+  .hud-objective { max-width: calc(46vw / var(--ui-scale, 1)); padding: 6px 10px; }
   .hud-obj-text { display: none; }
   .hud-players { gap: 5px; }
   .hud-chip { padding: 5px 9px; font-size: 12px; }
   .title-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
   .mode-card { min-height: 84px; padding: 10px 12px; }
-  .action-tray { width: calc(100vw - 20px - var(--sal) - var(--sar)); justify-content: center; border-radius: 18px; }
+  .action-tray { width: calc(calc(100vw / var(--ui-scale, 1)) - 20px - var(--sal) - var(--sar)); justify-content: center; border-radius: 18px; }
   .btn-roll { flex: 1; justify-content: center; }
   .panel { padding: 16px; }
   .turn-banner { top: calc(64px + var(--sat)); font-size: 14px; }
+  /* five-column results table must fit a phone-width panel (Score was clipped) */
+  .result-table th, .result-table td { padding: 7px 4px; }
+  .result-table th { font-size: 10.5px; letter-spacing: .02em; }
+  .result-table .breakdown span { margin-right: 6px; }
 }
 /* landscape mobile: narrow status rail preserved */
 @media (max-height: 500px) and (orientation: landscape) {
@@ -397,7 +404,7 @@ body.left-handed .float-picker { left: auto; right: calc(14px + var(--sar)); tra
   .action-tray { bottom: calc(8px + var(--sab)); padding: 6px 10px; }
   .btn-roll { padding: 8px 18px; font-size: 15px; }
   .die-face { font-size: 20px; }
-  .rail { bottom: calc(64px + var(--sab)); max-height: 56vh; }
+  .rail { bottom: calc(64px + var(--sab)); max-height: calc(56vh / var(--ui-scale, 1)); }
   .turn-banner { top: calc(56px + var(--sat)); padding: 5px 16px; font-size: 13px; }
   .caption-line { bottom: calc(70px + var(--sab)); }
 }
