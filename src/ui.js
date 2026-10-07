@@ -1446,6 +1446,7 @@ function showResults(lessonOnly = false) {
     unlocksListedInResults = true;
     try { updateProgression(results); } finally { unlocksListedInResults = false; }
   }
+  if (!app.replayMode && !lessonOnly && s.lbText === undefined) postToLeaderboard(s, results);
   const newAch = Object.keys(app.save.achievements).filter((k) => !before.has(k));
 
   const body = $('#results-body');
@@ -1494,6 +1495,7 @@ function showResults(lessonOnly = false) {
     table.append(tb);
     body.append(table);
     body.append(el('p', { class: 'hint', text: `Seed ${results.seed} · ${results.turns} turns · ${Math.round(results.elapsedMs / 1000)}s · ties break on objective, then invalid actions, then time.` }));
+    if (s.lbText) body.append(el('p', { id: 'results-lb', class: 'muted', text: s.lbText, 'aria-live': 'polite' }));
   }
 
   if (newAch.length) {
@@ -1533,6 +1535,20 @@ function showResults(lessonOnly = false) {
   app.platform.track('round_end', { mode: app.mode, won, turns: results.turns });
   setState(AppState.PROGRESSION, 'results-shown');
   showOverlay('results');
+}
+
+// Hosted play only: post a finished journey, daily or challenge match to the
+// platform high-score board; the results panel shows the player's rank.
+function postToLeaderboard(s, results) {
+  s.lbText = null;
+  if (!app.platform.hosted || !['journey', 'daily', 'challenge'].includes(app.mode)) return;
+  const me = results.rows.find((r) => r.seat === 0);
+  s.lbText = shText('lbPosting');
+  app.platform.submitScore(Math.max(0, me?.breakdown.total ?? 0)).then((r) => {
+    s.lbText = !r.posted ? shText('lbFailed') : r.rank ? shText('lbRank', { rank: r.rank }) : shText('lbPosted');
+    const line = document.getElementById('results-lb');
+    if (line && app.session === s) line.textContent = s.lbText;
+  });
 }
 
 function retryCurrent() {
