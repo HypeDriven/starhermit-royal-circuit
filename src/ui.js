@@ -51,6 +51,8 @@ const app = {
   lessonStepIdx: 0,
   capturedThisGame: 0,     // times the primary player was captured (flawless)
   gamepad: { idx: null, prev: [] },
+  cloudReady: false,       // hosted: set once the boot cloud load has been applied
+  cloudHeld: false,        // a cloud mirror was requested before that
 };
 
 function setState(next, reason, owner = 'ui') {
@@ -92,6 +94,16 @@ function displayName() {
 /** Local write + cloud mirror (debounced; no-op when offline). */
 function persistSave() {
   storeSave(app.save);
+  queueCloudMirror();
+}
+
+/**
+ * Cloud mirror of app.save, held until the boot cloud load is applied: a
+ * saveJSON() queued during that load would stay pending in the SDK and PUT
+ * the stale local doc over the adopted (newer) remote one ~2 s later.
+ */
+function queueCloudMirror() {
+  if (!app.cloudReady) { app.cloudHeld = true; return; }
   app.platform?.queueCloudSave(serializeSave(app.save));
 }
 
@@ -127,14 +139,21 @@ async function applyPlatformIdentity() {
   const p = app.platform;
   if (!p?.hosted) return;
   p.onSyncChange = renderSyncStatus;
+  let adopted = false;
   try {
     const doc = await p.cloudLoad();
     const payload = doc && parseDoc(doc);
     if (payload && payload.profile && payload.stats) {
       app.save = payload;
       storeSave(app.save);
+      adopted = true;
     }
   } catch { /* keep the local cache */ }
+  // Release held mirrors: once the remote doc is adopted they are stale (remote
+  // wins); otherwise the local doc they described is still current, so push it.
+  app.cloudReady = true;
+  if (app.cloudHeld && !adopted) p.queueCloudSave(serializeSave(app.save));
+  app.cloudHeld = false;
   try { await p.fetchNickname(); } catch { /* fallback name already set */ }
   p.avatarUrl().then((url) => {
     const av = $('#profile-avatar');
@@ -860,7 +879,7 @@ function showProfile() {
     if (await confirmDialog('Erase all local progress, settings stay. This cannot be undone.')) {
       localStorage.removeItem('royal-circuit:save:v1');
       app.save = loadSave();
-      if (hosted) app.platform.queueCloudSave(serializeSave(app.save)); // mirror the wipe
+      if (hosted) queueCloudMirror(); // mirror the wipe
       toast('Progress erased.');
       hideOverlay('profile');
       showTitle();
