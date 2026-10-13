@@ -166,7 +166,7 @@ export function createAudio() {
   /** Generic enveloped oscillator blip. */
   function tone(out, { t, type = 'sine', freq, freqEnd = 0, attack = 0.005, decay = 0.15, gain = 0.2 }) {
     const dur = attack + decay;
-    const o = ctx.createOscillator();
+    const o = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createOscillator(), null) : ctx.createOscillator());
     o.type = type;
     o.frequency.setValueAtTime(freq, t);
     if (freqEnd > 0) o.frequency.exponentialRampToValueAtTime(freqEnd, t + dur);
@@ -180,7 +180,7 @@ export function createAudio() {
   /** Generic enveloped, filtered noise burst from the shared buffer. */
   function noiseHit(out, { t, attack = 0.002, decay = 0.08, gain = 0.15, type = 'bandpass', freq = 2000, freqEnd = 0, q = 1 }) {
     const dur = attack + decay;
-    const src = ctx.createBufferSource();
+    const src = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createBufferSource(), null) : ctx.createBufferSource());
     src.buffer = noiseBuf;
     src.loop = true;
     const f = ctx.createBiquadFilter();
@@ -338,7 +338,7 @@ export function createAudio() {
 
   /** Play a decoded clip once through the effects bus (inherits volume/mute). */
   function playSample(buf) {
-    const src = ctx.createBufferSource();
+    const src = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createBufferSource(), null) : ctx.createBufferSource());
     src.buffer = buf;
     src.connect(buses.effects);
     src.start();
@@ -444,7 +444,7 @@ export function createAudio() {
 
   function startAmbience() {
     if (ambWash || !ctx) return;
-    const src = ctx.createBufferSource();
+    const src = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createBufferSource(), null) : ctx.createBufferSource());
     src.buffer = noiseBuf;
     src.loop = true;
     const filt = ctx.createBiquadFilter();
@@ -452,7 +452,7 @@ export function createAudio() {
     filt.frequency.value = ambKind === 'night' ? 260 : ambKind === 'garden' ? 900 : 480;
     const g = ctx.createGain();
     g.gain.value = 0.05; // quiet wash
-    const lfo = ctx.createOscillator(); // slow swell so the wash breathes
+    const lfo = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createOscillator(), null) : ctx.createOscillator()); // slow swell so the wash breathes
     lfo.frequency.value = 0.09;
     const lg = ctx.createGain();
     lg.gain.value = 0.02;
@@ -520,7 +520,7 @@ export function createAudio() {
       const g = ctx.createGain();
       g.gain.value = volumes[k];
       g.connect(master);
-      buses[k] = g;
+      buses[k] = (globalThis.GameOptions ? globalThis.GameOptions.tagBus(g, k) : g);
     }
     for (const k of ['pad', 'pluck', 'drum', 'bell']) {
       const g = ctx.createGain();

@@ -1397,14 +1397,14 @@ export function createRenderer(canvas, opts = {}) {
     }
     if (R.composer) {
       try {
-        R.composer.render(dt);
+        (globalThis.GameOptions ? globalThis.GameOptions.draw(R.composer.renderer, () => R.composer.render(dt)) : R.composer.render(dt));
       } catch {
         R.postFailed = true;
         disposeComposer();
-        renderer.render(scene, camera);
+        (globalThis.GameOptions ? globalThis.GameOptions.draw(renderer, () => renderer.render(scene, camera)) : renderer.render(scene, camera));
       }
     } else {
-      renderer.render(scene, camera);
+      (globalThis.GameOptions ? globalThis.GameOptions.draw(renderer, () => renderer.render(scene, camera)) : renderer.render(scene, camera));
     }
     if (!R.ready) {
       R.ready = true;
