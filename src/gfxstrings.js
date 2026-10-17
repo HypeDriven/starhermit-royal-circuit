@@ -1,8 +1,9 @@
 /**
  * gfxstrings.js — localized strings for the Graphics settings section.
- * The locale comes from navigator.language (the game has no language
- * setting); unknown locales fall back by language, then to en-US.
+ * The locale defaults to the game language (i18n.js, which follows the
+ * StarHermit Language setting); unknown locales fall back by language, then to en-US.
  */
+import { getLang } from './i18n.js';
 
 const EN = {
   quality: 'Quality',
@@ -160,7 +161,7 @@ export const GFX_STRINGS = {
 const BY_LANG = { en: 'en-US', es: 'es-419', de: 'de-DE', fr: 'fr-FR', pt: 'pt-BR', it: 'it-IT' };
 
 /** Strings for a BCP-47 tag (defaults to the browser language). */
-export function gfxStrings(tag = (typeof navigator !== 'undefined' && navigator.language) || 'en-US') {
+export function gfxStrings(tag = getLang()) {
   const t = String(tag);
   const exact = Object.keys(GFX_STRINGS).find((k) => k.toLowerCase() === t.toLowerCase());
   if (exact) return GFX_STRINGS[exact];

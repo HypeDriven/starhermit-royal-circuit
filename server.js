@@ -148,6 +148,8 @@ function serveStatic(req, res, pathname) {
     rel === 'ui-scale.js' ||
     rel === 'browser-guard.js' ||
     rel === 'starhermit-sdk.js' ||
+    rel === 'sh-language.js' ||
+    rel === 'game-options.js' ||
     /^(src|vendor|docs|assets|sfx)\//.test(rel);
   if (!allowed) return sendJson(res, 404, { error: 'not-found' });
 

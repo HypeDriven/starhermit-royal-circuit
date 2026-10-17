@@ -20,16 +20,24 @@ const timers = { setTimeout: (fn, ms) => (ms > 5000 ? 0 : setTimeout(fn, ms)), c
 let net, local;
 function stubNet() {
   const calls = [];
-  const store = { save: null, patches: [], controls: [] };
+  const store = { save: null, etag: null, version: 0, patches: [], controls: [] };
   const fetch = async (url, init = {}) => {
     const method = init.method || 'GET';
     calls.push({ method, url, auth: init.headers && init.headers.Authorization });
     const json = (code, body) => new Response(JSON.stringify(body), { status: code, headers: { 'Content-Type': 'application/json' } });
     const g = '/api/v1/games/royal-circuit';
     if (url === '/api/v1/users/u-1234567890/profile') return json(200, { nickname: 'Lantern Lu' });
+    if (url === '/api/v1/me/cloud-saves/game%3Aroyal-circuit/info') return json(200, store.save ? { exists: true, etag: store.etag } : { exists: false });
     if (url === '/api/v1/me/cloud-saves/game%3Aroyal-circuit') {
       if (method === 'GET') return store.save ? new Response(store.save, { status: 200 }) : json(404, {});
-      if (method === 'PUT') { store.save = Buffer.from(JSON.parse(init.body).dataBase64, 'base64'); return json(200, {}); }
+      if (method === 'PUT') {
+        // Conditional writes (SDK ETag): a write based on an older version loses with 412.
+        const h = init.headers || {};
+        if ((h['If-Match'] && h['If-Match'] !== store.etag) || (h['If-None-Match'] === '*' && store.save)) return json(412, { etag: store.etag });
+        store.save = Buffer.from(JSON.parse(init.body).dataBase64, 'base64');
+        store.etag = `"v${++store.version}"`;
+        return json(200, { etag: store.etag });
+      }
     }
     if (url === `${g}/settings`) {
       if (method === 'GET') return json(200, { settings: { audio: { music: 0.1 }, theme: 'moon-garden' } });
@@ -94,7 +102,8 @@ test('hosted: token, nickname, cloud save, settings KV, controls, board', async 
   p.resetControls();
   await sleep(10);
   assert.deepEqual(net.store.controls.map((c) => c.method), ['PUT', 'DELETE']);
-  assert.deepEqual(net.store.controls[0].body, { bindings: { undo: ['KeyZ'] } });
+  // The SDK writes the player's full binding set (loaded overrides + the remap).
+  assert.deepEqual(net.store.controls[0].body, { bindings: { hint: ['KeyJ'], undo: ['KeyZ'] } });
 
   assert.deepEqual(await p.fetchGlobalBoard(), [{ rank: 1, name: 'Lantern Lu', score: 42 }]);
   assert.ok(net.calls.every((c) => c.auth === `Bearer ${TOKEN}`));
@@ -102,7 +111,8 @@ test('hosted: token, nickname, cloud save, settings KV, controls, board', async 
 });
 
 test('standalone on the platform host: no network; sign-in offered', async () => {
-  launch('', 'royal-circuit.starhermit.com');
+  // Sign-in is offered only on a game's UUID host (<uuid>.starhermit.com).
+  launch('', '0b9d6f2e-3c4a-4e5b-9a7c-1d2e3f405162.starhermit.com');
   const p = await new Platform().init();
   assert.equal(p.hosted, false);
   assert.equal(p.canSignIn(), true);
@@ -132,4 +142,34 @@ test('standalone locally: no network request at all', async () => {
   assert.equal(p.funnel.length, 1, 'telemetry stays in memory');
   assert.deepEqual(local, [], 'no own-server probe or telemetry');
   assert.deepEqual(net.calls, []);
+});
+
+test('save conflict: a write that loses to another device reloads the cloud copy for the merge, then saves', async () => {
+  launch(`#game_token=${TOKEN}`, 'localhost');
+  const p = await new Platform().init();
+  assert.equal(await p.cloudLoad(), null);
+  p.queueCloudSave({ version: 1, payload: { stats: { gamesWon: 1 } } });
+  await p.flushCloudSave();
+  assert.equal(net.store.etag, '"v1"');
+  // Another device (its own SDK instance on the same account) saves in between.
+  const loc2 = { hash: `#game_token=${TOKEN}`, pathname: '/', search: '', hostname: 'localhost', href: `https://localhost/#game_token=${TOKEN}`, origin: 'https://localhost' };
+  const other = SDK.create({ window: { location: loc2, history: { state: null, replaceState() {} } }, fetch: net.fetch, ...timers });
+  other.init();
+  await other.loadJSON();
+  other.saveJSON({ version: 1, payload: { stats: { gamesWon: 7 } } }, 0);
+  await other.flushSave(true);
+  assert.equal(net.store.etag, '"v2"');
+  const seen = [];
+  p.onSaveConflict = async (remote) => {
+    seen.push(remote);
+    p.queueCloudSave({ version: 1, payload: { stats: { gamesWon: 7, merged: true } } });
+    await p.flushCloudSave();
+  };
+  p.queueCloudSave({ version: 1, payload: { stats: { gamesWon: 2 } } });
+  await p.flushCloudSave();
+  for (let i = 0; i < 50 && !seen.length; i++) await sleep(5);
+  await sleep(20);
+  assert.deepEqual(seen, [{ version: 1, payload: { stats: { gamesWon: 7 } } }]);
+  assert.deepEqual(await other.loadJSON(), { version: 1, payload: { stats: { gamesWon: 7, merged: true } } });
+  assert.equal(p.syncStatus, 'synced');
 });

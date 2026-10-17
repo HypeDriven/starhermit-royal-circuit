@@ -1,5 +1,7 @@
 // Royal Circuit — StarHermit platform chrome strings (sign-in, invite link, controls)
-// in the nine supported locales, picked from navigator.language.
+// in the nine supported locales, following the game language (i18n.js).
+import { getLang } from './i18n.js';
+
 
 const BASE = {
   'en-US': {
@@ -71,8 +73,7 @@ function pickLocale(lang) {
 
 /** shText('inviteLink', { url }) in the player's locale. */
 export function shText(key, vars) {
-  const nav = typeof navigator !== 'undefined' ? navigator.language : 'en-US';
-  const L = BASE[pickLocale(nav)] || BASE['en-US'];
+  const L = BASE[pickLocale(getLang())] || BASE['en-US'];
   let s = L[key] ?? BASE['en-US'][key] ?? key;
   if (vars) for (const [k, v] of Object.entries(vars)) s = s.replace(`{${k}}`, v);
   return s;

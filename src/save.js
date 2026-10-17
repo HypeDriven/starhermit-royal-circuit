@@ -93,6 +93,57 @@ export function loadSave() {
 export function storeSave(save) {
   return write(KEY, save);
 }
+const num = (v) => (Number.isFinite(v) ? v : 0);
+const later = (a, b) => (!a ? b : !b ? a : (String(a) > String(b) ? a : b));
+const earlier = (a, b) => (!a ? b : !b ? a : (String(a) < String(b) ? a : b));
+
+/**
+ * Merge two save payloads (cloud `remote`, this device's `local`) so neither
+ * side's progress is lost: best journey stars and turns per stage, every
+ * completed lesson, the better daily result per date, every achievement (the
+ * earliest unlock time), the larger of each counter, the union of both local
+ * boards (top 50) and the higher rating. The profile name is this device's
+ * unless it is still the default guest name.
+ */
+export function mergeSaves(remote, local) {
+  const d = defaultSave();
+  const r = { ...d, ...(remote || {}) };
+  const l = { ...d, ...(local || {}) };
+  const out = defaultSave();
+  out.profile = { ...r.profile, ...(l.profile?.name && l.profile.name !== d.profile.name ? l.profile : {}) };
+  for (const id of new Set([...Object.keys(r.journey || {}), ...Object.keys(l.journey || {})])) {
+    const a = r.journey?.[id], b = l.journey?.[id];
+    if (!a || !b) { out.journey[id] = { ...(a || b) }; continue; }
+    out.journey[id] = {
+      stars: Math.max(num(a.stars), num(b.stars)),
+      bestTurns: Math.min(a.bestTurns ?? Infinity, b.bestTurns ?? Infinity),
+      completedAt: earlier(a.completedAt, b.completedAt),
+    };
+    if (!Number.isFinite(out.journey[id].bestTurns)) delete out.journey[id].bestTurns;
+  }
+  out.lessons = { ...(r.lessons || {}), ...(l.lessons || {}) };
+  for (const day of new Set([...Object.keys(r.dailies || {}), ...Object.keys(l.dailies || {})])) {
+    const a = r.dailies?.[day], b = l.dailies?.[day];
+    out.dailies[day] = { ...(!a ? b : !b ? a : num(b.score) > num(a.score) ? b : a) };
+  }
+  for (const k of new Set([...Object.keys(r.achievements || {}), ...Object.keys(l.achievements || {})])) {
+    out.achievements[k] = earlier(r.achievements?.[k], l.achievements?.[k]);
+  }
+  const rs = r.stats || {}, ls = l.stats || {};
+  for (const k of ['gamesPlayed', 'gamesWon', 'captures', 'crowned', 'streakDays']) out.stats[k] = Math.max(num(rs[k]), num(ls[k]));
+  out.stats.lastDaily = later(rs.lastDaily, ls.lastDaily) || null;
+  for (const board of ['daily', 'best']) {
+    const seen = new Set();
+    out.leaderboards[board] = [...(r.leaderboards?.[board] || []), ...(l.leaderboards?.[board] || [])]
+      .filter((e) => { const key = `${e.at}|${e.seed}|${e.contentId}|${e.score}`; if (seen.has(key)) return false; seen.add(key); return true; })
+      .sort((a, b) => b.score - a.score || a.turns - b.turns)
+      .slice(0, 50);
+  }
+  out.ratings = { ...(r.ratings || {}), ...(l.ratings || {}) };
+  for (const k of Object.keys(out.ratings)) out.ratings[k] = Math.max(num(r.ratings?.[k]), num(l.ratings?.[k]));
+  return out;
+}
+
 /** Wrapped document for the cloud mirror (version + checksum + payload). */
 export function serializeSave(save) {
   return wrap(save);

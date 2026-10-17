@@ -13,29 +13,29 @@
 <script src="ui-scale.js"></script>
 <script src="browser-guard.js"></script>
 <script src="starhermit-sdk.js"></script>
+<script src="sh-language.js"></script>
 </head>
 <body>
-  <a class="skip-link" href="#action-tray">Skip to game controls</a>
+  <a class="skip-link" href="#action-tray" data-i18n="Skip to game controls">Skip to game controls</a>
 
   <!-- Three.js canvas: never the only UI; every control has a DOM equivalent -->
   <canvas id="gl" aria-hidden="true"></canvas>
   <div id="gl-fallback" hidden role="alert">
     <div class="panel">
-      <h2>3D unavailable</h2>
-      <p>Royal Circuit could not start WebGL on this device. Your progress is saved;
-      the full game board is still available in the accessible board panel.</p>
-      <button id="gl-fallback-continue" class="btn">Continue in 2D mode</button>
+      <h2 data-i18n="3D unavailable">3D unavailable</h2>
+      <p data-i18n="Royal Circuit could not start WebGL on this device. Your progress is saved; the full game board is still available in the accessible board panel.">Royal Circuit could not start WebGL on this device. Your progress is saved; the full game board is still available in the accessible board panel.</p>
+      <button id="gl-fallback-continue" class="btn" data-i18n="Continue in 2D mode">Continue in 2D mode</button>
     </div>
   </div>
 
   <div id="app" data-state="boot">
 
     <!-- ======================= BOOT ======================= -->
-    <section id="screen-boot" class="screen active" aria-label="Loading">
+    <section id="screen-boot" class="screen active" aria-label="Loading" data-i18n-aria="Loading">
       <div class="boot-box">
         <div class="logo-mark" aria-hidden="true">🏮</div>
         <h1 class="game-title">Royal Circuit</h1>
-        <div class="progress" role="progressbar" aria-label="Loading" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="progress" role="progressbar" aria-label="Loading" data-i18n-aria="Loading" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
           <div class="progress-fill" id="boot-fill"></div>
         </div>
         <p id="boot-status" class="muted">Lighting the lanterns…</p>
@@ -48,42 +48,42 @@
         <header class="title-head">
           <div class="logo-mark big" aria-hidden="true">🏮</div>
           <h1 id="title-h" class="game-title">Royal Circuit</h1>
-          <p class="tagline">Race your floats around the festival circuit. First to crown all four wins.</p>
+          <p class="tagline" data-i18n="Race your floats around the festival circuit. First to crown all four wins.">Race your floats around the festival circuit. First to crown all four wins.</p>
         </header>
-        <button id="btn-play" class="btn btn-play">▶ Play</button>
-        <nav class="title-grid" aria-label="Game modes">
+        <button id="btn-play" class="btn btn-play" data-i18n="▶ Play">▶ Play</button>
+        <nav class="title-grid" aria-label="Game modes" data-i18n-aria="Game modes">
           <button class="mode-card" data-mode="daily" id="card-daily">
             <span class="mode-icon" aria-hidden="true">🌇</span>
-            <span class="mode-name">Daily Circuit</span>
+            <span class="mode-name" data-i18n="Daily Circuit">Daily Circuit</span>
             <span class="mode-sub" id="daily-sub">One shared race each day</span>
           </button>
           <button class="mode-card" data-mode="journey" id="card-journey">
             <span class="mode-icon" aria-hidden="true">🗺️</span>
-            <span class="mode-name">Journey</span>
+            <span class="mode-name" data-i18n="Journey">Journey</span>
             <span class="mode-sub" id="journey-sub">40 festival stages</span>
           </button>
           <button class="mode-card" data-mode="learn" id="card-learn">
             <span class="mode-icon" aria-hidden="true">📜</span>
-            <span class="mode-name">Learn</span>
-            <span class="mode-sub">Interactive lessons</span>
+            <span class="mode-name" data-i18n="Learn">Learn</span>
+            <span class="mode-sub" data-i18n="Interactive lessons">Interactive lessons</span>
           </button>
           <button class="mode-card" data-mode="practice" id="card-practice">
             <span class="mode-icon" aria-hidden="true">🎋</span>
-            <span class="mode-name">Practice</span>
-            <span class="mode-sub">Unranked, undo allowed</span>
+            <span class="mode-name" data-i18n="Practice">Practice</span>
+            <span class="mode-sub" data-i18n="Unranked, undo allowed">Unranked, undo allowed</span>
           </button>
           <button class="mode-card" data-mode="challenge" id="card-challenge">
             <span class="mode-icon" aria-hidden="true">⚡</span>
-            <span class="mode-name">Challenges</span>
-            <span class="mode-sub">Constrained goals</span>
+            <span class="mode-name" data-i18n="Challenges">Challenges</span>
+            <span class="mode-sub" data-i18n="Constrained goals">Constrained goals</span>
           </button>
         </nav>
         <footer class="title-foot">
-          <button class="chip" id="chip-profile" aria-label="Profile"><span aria-hidden="true" id="profile-avatar">🏮</span> <span id="profile-name">Guest Envoy</span> <span id="sync-status" class="sync-status" role="status"></span></button>
-          <button class="chip" id="chip-achievements">Achievements</button>
-          <button class="chip" id="chip-leaderboards">Leaderboards</button>
-          <button class="chip" id="chip-help">How to Play</button>
-          <button class="chip" id="chip-settings">Settings</button>
+          <button class="chip" id="chip-profile" aria-label="Profile" data-i18n-aria="Profile"><span aria-hidden="true" id="profile-avatar">🏮</span> <span id="profile-name">Guest Envoy</span> <span id="sync-status" class="sync-status" role="status"></span></button>
+          <button class="chip" id="chip-achievements" data-i18n="Achievements">Achievements</button>
+          <button class="chip" id="chip-leaderboards" data-i18n="Leaderboards">Leaderboards</button>
+          <button class="chip" id="chip-help" data-i18n="How to Play">How to Play</button>
+          <button class="chip" id="chip-settings" data-i18n="Settings">Settings</button>
           <button class="chip" id="chip-invite" hidden>Invite a friend</button>
         </footer>
         <button class="btn" id="btn-signin" hidden>Sign in with StarHermit</button>
@@ -96,8 +96,8 @@
         <h2 id="setup-h">Set up</h2>
         <div id="setup-body"><!-- built per mode by ui.js --></div>
         <div class="row end">
-          <button class="btn ghost" id="setup-back">Back</button>
-          <button class="btn primary" id="setup-start">Start</button>
+          <button class="btn ghost" id="setup-back" data-i18n="Back">Back</button>
+          <button class="btn primary" id="setup-start" data-i18n="Start">Start</button>
         </div>
       </div>
     </section>
@@ -106,8 +106,8 @@
     <section id="screen-journey" class="screen" aria-labelledby="journey-h">
       <div class="panel wide">
         <div class="row between">
-          <h2 id="journey-h">Journey</h2>
-          <button class="btn ghost" data-nav="title">Back</button>
+          <h2 id="journey-h" data-i18n="Journey">Journey</h2>
+          <button class="btn ghost" data-nav="title" data-i18n="Back">Back</button>
         </div>
         <p class="muted" id="journey-progress-line"></p>
         <div id="journey-grid" class="stage-grid" role="list"></div>
@@ -118,8 +118,8 @@
     <section id="screen-learn" class="screen" aria-labelledby="learn-h">
       <div class="panel wide">
         <div class="row between">
-          <h2 id="learn-h">Learn the Circuit</h2>
-          <button class="btn ghost" data-nav="title">Back</button>
+          <h2 id="learn-h" data-i18n="Learn the Circuit">Learn the Circuit</h2>
+          <button class="btn ghost" data-nav="title" data-i18n="Back">Back</button>
         </div>
         <div id="lesson-list" class="card-list" role="list"></div>
       </div>
@@ -129,24 +129,24 @@
     <section id="screen-challenge" class="screen" aria-labelledby="ch-h">
       <div class="panel wide">
         <div class="row between">
-          <h2 id="ch-h">Challenges</h2>
-          <button class="btn ghost" data-nav="title">Back</button>
+          <h2 id="ch-h" data-i18n="Challenges">Challenges</h2>
+          <button class="btn ghost" data-nav="title" data-i18n="Back">Back</button>
         </div>
         <div id="challenge-list" class="card-list" role="list"></div>
       </div>
     </section>
 
     <!-- ======================= GAME HUD ======================= -->
-    <section id="screen-game" class="screen game" aria-label="Game">
+    <section id="screen-game" class="screen game" aria-label="Game" data-i18n-aria="Game">
       <header id="hud-top" class="hud-top">
         <div class="hud-objective">
           <h2 id="hud-mode-name" class="hud-mode">Practice</h2>
           <p id="hud-objective" class="hud-obj-text">Crown all four floats.</p>
         </div>
-        <div id="hud-players" class="hud-players" role="list" aria-label="Players"></div>
+        <div id="hud-players" class="hud-players" role="list" aria-label="Players" data-i18n-aria="Players"></div>
         <div class="hud-top-actions">
-          <button id="btn-board-state" class="icon-btn" aria-label="Board state (accessible text)" title="Board state">☰</button>
-          <button id="btn-pause" class="icon-btn" aria-label="Pause" title="Pause (Esc)">⏸</button>
+          <button id="btn-board-state" class="icon-btn" aria-label="Board state (accessible text)" data-i18n-aria="Board state (accessible text)" title="Board state" data-i18n-title="Board state">☰</button>
+          <button id="btn-pause" class="icon-btn" aria-label="Pause" data-i18n-aria="Pause" title="Pause (Esc)" data-i18n-title="Pause (Esc)">⏸</button>
         </div>
       </header>
 
@@ -155,41 +155,41 @@
 
       <!-- compact layouts: drawer toggles for the two rails -->
       <div id="rail-toggles" class="rail-toggles">
-        <button type="button" class="btn ghost rail-toggle" data-rail="rail-left" aria-expanded="false" aria-controls="rail-left">Objective</button>
-        <button type="button" class="btn ghost rail-toggle" data-rail="rail-right" aria-expanded="false" aria-controls="rail-right">Turn</button>
+        <button type="button" class="btn ghost rail-toggle" data-rail="rail-left" aria-expanded="false" aria-controls="rail-left" data-i18n="Objective">Objective</button>
+        <button type="button" class="btn ghost rail-toggle" data-rail="rail-right" aria-expanded="false" aria-controls="rail-right" data-i18n="Turn">Turn</button>
       </div>
 
       <!-- left rail: objective/progression (wide screens) -->
-      <aside id="rail-left" class="rail rail-left" aria-label="Objective and progress">
-        <h3>Objective</h3>
+      <aside id="rail-left" class="rail rail-left" aria-label="Objective and progress" data-i18n-aria="Objective and progress">
+        <h3 data-i18n="Objective">Objective</h3>
         <p id="rail-objective">Crown all four floats to win.</p>
-        <h3>Progress</h3>
+        <h3 data-i18n="Progress">Progress</h3>
         <ul id="rail-progress" class="progress-list"></ul>
-        <h3>Rules</h3>
+        <h3 data-i18n="Rules">Rules</h3>
         <ul id="rail-rules" class="rules-list"></ul>
       </aside>
 
       <!-- right rail: contextual actions + status -->
-      <aside id="rail-right" class="rail rail-right" aria-label="Actions and status">
-        <h3>Turn</h3>
+      <aside id="rail-right" class="rail rail-right" aria-label="Actions and status" data-i18n-aria="Actions and status">
+        <h3 data-i18n="Turn">Turn</h3>
         <p id="rail-turn" class="rail-turn">—</p>
         <div id="rail-die" class="rail-die" aria-hidden="true">⚄</div>
         <div id="rail-context"></div>
       </aside>
 
       <!-- bottom thumb-zone action tray -->
-      <div id="action-tray" class="action-tray" role="toolbar" aria-label="Turn actions">
-        <button id="btn-roll" class="btn btn-roll" aria-label="Roll the festival die">
+      <div id="action-tray" class="action-tray" role="toolbar" aria-label="Turn actions" data-i18n-aria="Turn actions">
+        <button id="btn-roll" class="btn btn-roll" aria-label="Roll the festival die" data-i18n-aria="Roll the festival die">
           <span class="die-face" id="die-face" aria-hidden="true">⚅</span>
-          <span id="roll-label">Roll</span>
+          <span id="roll-label" data-i18n="Roll">Roll</span>
         </button>
-        <button id="btn-pass" class="btn" hidden>Pass</button>
-        <button id="btn-undo" class="btn ghost" hidden>Undo</button>
-        <button id="btn-hint" class="btn ghost">Hint</button>
+        <button id="btn-pass" class="btn" hidden data-i18n="Pass">Pass</button>
+        <button id="btn-undo" class="btn ghost" hidden data-i18n="Undo">Undo</button>
+        <button id="btn-hint" class="btn ghost" data-i18n="Hint">Hint</button>
       </div>
 
       <!-- float picker: DOM equivalent of canvas picking -->
-      <div id="float-picker" class="float-picker" role="group" aria-label="Choose a float" hidden></div>
+      <div id="float-picker" class="float-picker" role="group" aria-label="Choose a float" data-i18n-aria="Choose a float" hidden></div>
 
       <!-- lesson coach -->
       <div id="lesson-coach" class="lesson-coach" role="status" hidden></div>
@@ -200,13 +200,13 @@
   <div id="overlay-root">
     <div id="overlay-pause" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="pause-h">
       <div class="panel">
-        <h2 id="pause-h">Paused</h2>
+        <h2 id="pause-h" data-i18n="Paused">Paused</h2>
         <div class="col gap">
-          <button class="btn primary" id="btn-resume">Resume</button>
-          <button class="btn" id="btn-pause-settings">Settings</button>
-          <button class="btn" id="btn-pause-help">How to Play</button>
-          <button class="btn" id="btn-restart">Restart</button>
-          <button class="btn danger" id="btn-leave">Leave Game</button>
+          <button class="btn primary" id="btn-resume" data-i18n="Resume">Resume</button>
+          <button class="btn" id="btn-pause-settings" data-i18n="Settings">Settings</button>
+          <button class="btn" id="btn-pause-help" data-i18n="How to Play">How to Play</button>
+          <button class="btn" id="btn-restart" data-i18n="Restart">Restart</button>
+          <button class="btn danger" id="btn-leave" data-i18n="Leave Game">Leave Game</button>
         </div>
       </div>
     </div>
@@ -214,26 +214,26 @@
     <div id="overlay-settings" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="settings-h">
       <div class="panel wide settings-panel">
         <div class="row between">
-          <h2 id="settings-h">Settings</h2>
-          <button class="btn ghost" id="settings-close">Done</button>
+          <h2 id="settings-h" data-i18n="Settings">Settings</h2>
+          <button class="btn ghost" id="settings-close" data-i18n="Done">Done</button>
         </div>
-        <div class="tabs" role="tablist" aria-label="Settings sections">
-          <button role="tab" aria-selected="true" class="tab active" data-tab="audio" id="tab-audio">Audio</button>
-          <button role="tab" aria-selected="false" class="tab" data-tab="graphics" id="tab-graphics">Graphics</button>
-          <button role="tab" aria-selected="false" class="tab" data-tab="controls" id="tab-controls">Controls</button>
-          <button role="tab" aria-selected="false" class="tab" data-tab="access" id="tab-access">Accessibility</button>
+        <div class="tabs" role="tablist" aria-label="Settings sections" data-i18n-aria="Settings sections">
+          <button role="tab" aria-selected="true" class="tab active" data-tab="audio" id="tab-audio" data-i18n="Audio">Audio</button>
+          <button role="tab" aria-selected="false" class="tab" data-tab="graphics" id="tab-graphics" data-i18n="Graphics">Graphics</button>
+          <button role="tab" aria-selected="false" class="tab" data-tab="controls" id="tab-controls" data-i18n="Controls">Controls</button>
+          <button role="tab" aria-selected="false" class="tab" data-tab="access" id="tab-access" data-i18n="Accessibility">Accessibility</button>
         </div>
-        <div id="settings-body" class="settings-body"></div>
+        <div id="settings-body" class="settings-body" data-options-graphics><div id="settings-tab-body"></div></div>
       </div>
     </div>
 
     <div id="overlay-results" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="results-h">
       <div class="panel wide results-panel">
-        <h2 id="results-h">Results</h2>
+        <h2 id="results-h" data-i18n="Results">Results</h2>
         <div id="results-body"></div>
         <div class="row end wrap">
-          <button class="btn ghost" id="results-replay">Watch Replay</button>
-          <button class="btn" id="results-retry">Retry</button>
+          <button class="btn ghost" id="results-replay" data-i18n="Watch Replay">Watch Replay</button>
+          <button class="btn" id="results-retry" data-i18n="Retry">Retry</button>
           <button class="btn primary" id="results-next">Continue</button>
         </div>
       </div>
@@ -242,8 +242,8 @@
     <div id="overlay-help" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="help-h">
       <div class="panel wide help-panel">
         <div class="row between">
-          <h2 id="help-h">How to Play</h2>
-          <button class="btn ghost" id="help-close">Close</button>
+          <h2 id="help-h" data-i18n="How to Play">How to Play</h2>
+          <button class="btn ghost" id="help-close" data-i18n="Close">Close</button>
         </div>
         <div id="help-body"></div>
       </div>
@@ -252,8 +252,8 @@
     <div id="overlay-achievements" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="ach-h">
       <div class="panel wide">
         <div class="row between">
-          <h2 id="ach-h">Achievements</h2>
-          <button class="btn ghost" id="ach-close">Close</button>
+          <h2 id="ach-h" data-i18n="Achievements">Achievements</h2>
+          <button class="btn ghost" id="ach-close" data-i18n="Close">Close</button>
         </div>
         <div id="ach-body" class="card-list"></div>
       </div>
@@ -262,12 +262,12 @@
     <div id="overlay-boards" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="boards-h">
       <div class="panel wide">
         <div class="row between">
-          <h2 id="boards-h">Leaderboards</h2>
-          <button class="btn ghost" id="boards-close">Close</button>
+          <h2 id="boards-h" data-i18n="Leaderboards">Leaderboards</h2>
+          <button class="btn ghost" id="boards-close" data-i18n="Close">Close</button>
         </div>
-        <div class="tabs" role="tablist" aria-label="Leaderboards">
-          <button role="tab" aria-selected="true" class="tab active" data-board="daily">Daily</button>
-          <button role="tab" aria-selected="false" class="tab" data-board="best">All-time</button>
+        <div class="tabs" role="tablist" aria-label="Leaderboards" data-i18n-aria="Leaderboards">
+          <button role="tab" aria-selected="true" class="tab active" data-board="daily" data-i18n="Daily">Daily</button>
+          <button role="tab" aria-selected="false" class="tab" data-board="best" data-i18n="All-time">All-time</button>
         </div>
         <div id="boards-body"></div>
       </div>
@@ -276,8 +276,8 @@
     <div id="overlay-profile" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="profile-h">
       <div class="panel">
         <div class="row between">
-          <h2 id="profile-h">Profile</h2>
-          <button class="btn ghost" id="profile-close">Close</button>
+          <h2 id="profile-h" data-i18n="Profile">Profile</h2>
+          <button class="btn ghost" id="profile-close" data-i18n="Close">Close</button>
         </div>
         <div id="profile-body"></div>
       </div>
@@ -286,8 +286,8 @@
     <div id="overlay-boardstate" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="bs-h">
       <div class="panel wide">
         <div class="row between">
-          <h2 id="bs-h">Board State</h2>
-          <button class="btn ghost" id="bs-close">Close</button>
+          <h2 id="bs-h" data-i18n="Board State">Board State</h2>
+          <button class="btn ghost" id="bs-close" data-i18n="Close">Close</button>
         </div>
         <div id="bs-body" class="board-mirror" tabindex="0"></div>
       </div>
@@ -295,11 +295,11 @@
 
     <div id="overlay-confirm" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="confirm-h">
       <div class="panel">
-        <h2 id="confirm-h">Are you sure?</h2>
+        <h2 id="confirm-h" data-i18n="Are you sure?">Are you sure?</h2>
         <p id="confirm-text"></p>
         <div class="row end">
-          <button class="btn ghost" id="confirm-no">Cancel</button>
-          <button class="btn danger" id="confirm-yes">Confirm</button>
+          <button class="btn ghost" id="confirm-no" data-i18n="Cancel">Cancel</button>
+          <button class="btn danger" id="confirm-yes" data-i18n="Confirm">Confirm</button>
         </div>
       </div>
     </div>

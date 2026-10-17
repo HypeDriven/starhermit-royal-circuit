@@ -17,6 +17,7 @@ import {
 import { chooseMove, aiName } from './ai.js';
 import { CONTENT_VERSION, BUILD_VERSION } from './content.js';
 import { storeSnapshot, clearSnapshot } from './save.js';
+import { T } from './i18n.js';
 
 const HASH_EVERY = 10; // periodic state hashes in the replay envelope
 
@@ -216,13 +217,13 @@ export class Session {
     const won = this.state.winner === me.seat;
     switch (goal.type) {
       case 'crown-first':
-        return { met: me.crowned >= (goal.count || 1), label: `Crown ${goal.count || 1} float(s)` };
+        return { met: me.crowned >= (goal.count || 1), label: T('Crown {n} float(s)', { n: goal.count || 1 }) };
       case 'captures':
-        return { met: me.captures >= goal.count, label: `${goal.count} captures` };
+        return { met: me.captures >= goal.count, label: T('{n} captures', { n: goal.count }) };
       case 'captures-then-win':
-        return { met: won && me.captures >= goal.count, label: `Win with ${goal.count}+ captures` };
+        return { met: won && me.captures >= goal.count, label: T('Win with {n}+ captures', { n: goal.count }) };
       case 'win-no-captures':
-        return { met: won && me.captures === 0, label: 'Win without capturing' };
+        return { met: won && me.captures === 0, label: T('Win without capturing') };
       default:
         return { met: won, label: null };
     }

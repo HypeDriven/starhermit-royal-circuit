@@ -12,6 +12,7 @@ import { createAudio } from './audio.js';
 import { init as initUI, DEFAULT_BINDINGS } from './ui.js';
 import { themeById } from './content.js';
 import { loadSettings, storeSettings } from './save.js';
+import { T, initLanguage } from './i18n.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -25,12 +26,14 @@ function bootProgress(pct, text) {
 }
 
 async function boot() {
-  bootProgress(8, 'Reading the festival ledger…');
+  // Game language first (sh-language.js: Language setting → account → browser) so boot text is localized.
+  initLanguage();
+  bootProgress(8, T('Reading the festival ledger…'));
   const settings = loadSettings();
 
   // Host handshake: clock sync + launch scope; degrades to local when static.
   const platform = await new Platform().init();
-  bootProgress(30, platform.hosted ? 'Signed in — your festival pass is active.' : 'Playing locally (no host).');
+  bootProgress(30, T(platform.hosted ? 'Signed in — your festival pass is active.' : 'Playing locally (no host).'));
   // Signed in: per-player settings and key bindings on StarHermit win over this device's copy.
   if (await platform.applyPlatformSettings(settings)) storeSettings(settings);
   const base = { ...DEFAULT_BINDINGS, ...(settings.input.bindings || {}) };
@@ -39,13 +42,13 @@ async function boot() {
 
   // Audio is fully procedural; safe to construct before the first gesture.
   const audio = createAudio();
-  bootProgress(48, 'Tuning the instruments…');
+  bootProgress(48, T('Tuning the instruments…'));
 
   // WebGL capability detection: the DOM game remains fully playable without it.
   let renderer = null;
   try {
     const { createRenderer } = await import('./render.js');
-    bootProgress(66, 'Lighting the lanterns…');
+    bootProgress(66, T('Lighting the lanterns…'));
     renderer = await new Promise((resolve, reject) => {
       try {
         const r = createRenderer($('#gl'), {
@@ -72,13 +75,13 @@ async function boot() {
     }
   }
 
-  bootProgress(88, 'Setting the tables…');
+  bootProgress(88, T('Setting the tables…'));
   initUI({ platform, renderer, audio, platformBindings });
-  bootProgress(100, 'Welcome to the festival.');
+  bootProgress(100, T('Welcome to the festival.'));
 }
 
 boot().catch((err) => {
   console.error('boot failed', err);
   const status = $('#boot-status');
-  if (status) status.textContent = 'Something went wrong while loading — please refresh.';
+  if (status) status.textContent = T('Something went wrong while loading — please refresh.');
 });

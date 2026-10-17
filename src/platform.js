@@ -8,9 +8,13 @@
  *   persisted, renewed by the SDK). The slug is the `game_scope` claim.
  * - Identity: profile nickname via the SDK ("Player <id>" fallback) + avatar.
  * - Cloud save mirrors the local save document to the `game:<slug>` slot;
- *   localStorage stays the offline cache and remote wins on conflict. Saves
- *   are debounced 2 s and flushed on pagehide/visibilitychange; sync status
- *   is surfaced via onSyncChange.
+ *   localStorage stays the offline cache. Writes after a load are conditional
+ *   (SDK ETag); when another device saved first the SDK emits `saveconflict`
+ *   and this adapter reloads the cloud document and hands it to
+ *   onSaveConflict, which merges and saves again. Saves are debounced 2 s and
+ *   flushed on pagehide/visibilitychange; sync status is surfaced via onSyncChange.
+ * - Settings KV: only the game's own groups (SETTING_GROUPS) are read and
+ *   patched; `ui.*` keys (the shared language choice) are left alone.
  * - Settings KV mirrors player preferences; controls come from the
  *   platform controls API (control.* in starhermit.txt).
  * - Leaderboards are read-only on-platform; personal bests stay local +
@@ -26,6 +30,8 @@
 const CLOUD_DEBOUNCE_MS = 2000;
 // Settings groups mirrored to the per-player KV (input bindings use the controls API).
 const SETTING_GROUPS = ['audio', 'graphics', 'accessibility', 'camera', 'theme', 'tutorial', 'consent'];
+import { T } from './i18n.js';
+
 const SH = () => (typeof window !== 'undefined' && window.StarHermit) || globalThis.StarHermit || null;
 
 export class Platform {
@@ -52,6 +58,7 @@ export class Platform {
       sh.init();
       this.hosted = sh.signedIn;
       sh.on('saved', (ok) => this.setSyncStatus(ok ? 'synced' : 'error'));
+      sh.on('saveconflict', () => this.resolveConflict());
       sh.on('auth', (a) => {
         this.hosted = !!a.signedIn;
         if (!a.signedIn) { this.nickname = null; this.setSyncStatus('offline'); }
@@ -98,7 +105,7 @@ export class Platform {
   async profileFor(userId) {
     if (!userId || !this.hosted) return null;
     const p = await SH().profile(userId).catch(() => null);
-    return p ? p.displayName : `Player ${String(userId).slice(0, 8)}`;
+    return p ? p.displayName : T('Player {id}', { id: String(userId).slice(0, 8) });
   }
 
   /** The signed-in player's display name (null when local). */
@@ -175,6 +182,15 @@ export class Platform {
     return SH().loadJSON();
   }
 
+  /** Reload the cloud document after a refused conditional write; the UI merges and saves again. */
+  async resolveConflict() {
+    if (!this.hosted) return;
+    this.setSyncStatus('saving');
+    let remote = null;
+    try { remote = await SH().loadJSON(); } catch { this.setSyncStatus('error'); return; }
+    await this.onSaveConflict?.(remote);
+  }
+
   /** Debounced cloud mirror (2 s); call on every local persist. */
   queueCloudSave(save) {
     if (!this.hosted) return;
@@ -206,7 +222,7 @@ export class Platform {
     const entries = [];
     for (const e of raw.slice(0, 20)) {
       const userId = e.userId ?? e.user_id ?? e.sub;
-      const name = await this.profileFor(userId).catch(() => null) || 'Player';
+      const name = await this.profileFor(userId).catch(() => null) || T('Player');
       entries.push({
         rank: e.rank ?? e.place ?? entries.length + 1,
         name,

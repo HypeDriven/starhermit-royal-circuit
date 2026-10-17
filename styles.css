@@ -215,7 +215,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); height: 44px; }
 .hud-chip .dot.hex { border-radius: 4px; transform: rotate(30deg); }
 .hud-chip.active { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(232,176,75,.35); }
 .hud-chip .crowns { color: var(--accent); font-weight: 700; }
-.hud-top-actions { display: flex; gap: 8px; }
+.hud-top-actions { display: flex; gap: 8px; flex: 0 0 auto; }
+/* long mode names / player names wrap instead of pushing the top buttons off-screen */
+.hud-objective { flex: 0 0 auto; }
+.hud-players { min-width: 0; flex: 0 1 auto; }
 
 .turn-banner {
   position: absolute; top: calc(76px + var(--sat)); left: 50%; transform: translateX(-50%);
@@ -292,7 +295,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); height: 44px; }
 .settings-body .field:last-child { border-bottom: none; }
 .slider-row { display: grid; grid-template-columns: 130px 1fr 46px; gap: 10px; align-items: center; }
 /* graphics section */
-.gfx-section select { width: 100%; max-width: 100%; }
+.gfx-box select { width: 100%; max-width: 100%; }
 .gfx-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); column-gap: 14px; }
 .settings-body .gfx-grid .field { margin: 8px 0; }
 .gfx-slider { display: flex; align-items: center; gap: 12px; }
@@ -371,8 +374,10 @@ body.left-handed .float-picker { left: auto; right: calc(14px + var(--sar)); tra
   .rail.open { display: block; }
   .rail-left { left: calc(10px + var(--sal)); }
   .rail-right { right: calc(10px + var(--sar)); }
-  .rail-toggles { display: flex; gap: 6px; position: absolute; top: calc(52px + var(--sat)); right: calc(10px + var(--sar)); z-index: 6; }
-  .rail-toggles .btn { min-height: 40px; padding: 6px 12px; font-size: 13px; }
+  /* stacked under the ☰ / ⏸ buttons, inside the HUD's right column: never over
+     the player chips or the top buttons, whatever the language */
+  .rail-toggles { display: flex; flex-direction: column; align-items: stretch; gap: 6px; position: absolute; top: calc(70px + var(--sat)); right: calc(10px + var(--sar)); z-index: 6; }
+  .rail-toggles .btn { min-height: 40px; padding: 6px 8px; font-size: 13px; width: 96px; overflow-wrap: anywhere; }
   /* legal-action picker: a docked row above the tray, never over the board */
   .float-picker { bottom: calc(92px + var(--sab)); }
   .float-picker button { position: static !important; }
@@ -382,6 +387,7 @@ body.left-handed .float-picker { left: auto; right: calc(14px + var(--sar)); tra
 /* portrait mobile */
 @media (max-width: 700px) {
   .hud-objective { max-width: calc(46vw / var(--ui-scale, 1)); padding: 6px 10px; }
+  .hud-mode { font-size: 12px; letter-spacing: .02em; }
   .hud-obj-text { display: none; }
   .hud-players { gap: 5px; }
   .hud-chip { padding: 5px 9px; font-size: 12px; }
@@ -390,7 +396,7 @@ body.left-handed .float-picker { left: auto; right: calc(14px + var(--sar)); tra
   .action-tray { width: calc(calc(100vw / var(--ui-scale, 1)) - 20px - var(--sal) - var(--sar)); justify-content: center; border-radius: 18px; }
   .btn-roll { flex: 1; justify-content: center; }
   .panel { padding: 16px; }
-  .turn-banner { top: calc(64px + var(--sat)); font-size: 14px; }
+  .turn-banner { top: calc(164px + var(--sat)); font-size: 14px; }
   /* five-column results table must fit a phone-width panel (Score was clipped) */
   .result-table th, .result-table td { padding: 7px 4px; }
   .result-table th { font-size: 10.5px; letter-spacing: .02em; }
@@ -416,3 +422,6 @@ body.left-handed .float-picker { left: auto; right: calc(14px + var(--sar)); tra
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: .001s !important; transition-duration: .001s !important; }
 }
+/* The shared Language / Sound / Report sections (game-options.js) mount once in
+   #settings-body after the per-tab box; they show with the Graphics tab only. */
+#settings-body:not([data-tab="graphics"]) > .game-options-controls { display: none; }

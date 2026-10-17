@@ -48,6 +48,7 @@ import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { stubStarHermit, launchToken } from './starhermit-e2e.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SHOT = (stage, vp) => `/tmp/royal-circuit-e2e-${stage}-${vp}.png`;
@@ -274,6 +275,78 @@ async function graphicsPass(page, name, touch) {
   ok(`${name}: graphics settings — Low/High presets, override, render scale, persistence, Auto → low`);
 }
 
+
+// ---------- language + report (signed in through a stubbed StarHermit API) ----------
+// Automatic follows the account's preferred language (GET /api/v1/me/language →
+// fr-CA); choosing Italian in Settings → Graphics → Language mid-match re-renders
+// the HUD and the dialog in place and saves ui.language; Report a problem posts
+// to /reports. All through real clicks/taps.
+// Language-neutral: the human can act (Roll enabled or a float to pick).
+const humanReady = (page, timeout) => page.waitForFunction(() => {
+  const pk = document.getElementById('float-picker');
+  return (pk && !pk.hidden && pk.querySelectorAll('button').length > 0) || !document.getElementById('btn-roll').disabled;
+}, null, { timeout });
+
+async function languagePass(page, name, touch) {
+  const press1 = (loc) => (touch ? loc.tap() : loc.click());
+  const calls = await stubStarHermit(page, { preferredLanguage: 'fr-CA' });
+  await page.goto('about:blank');
+  await page.goto(`${BASE}/index.html#game_token=${launchToken()}`, { waitUntil: 'load' });
+  await page.waitForSelector('#screen-title.active', { state: 'visible', timeout: 20000 });
+  await page.waitForFunction(() => document.documentElement.lang === 'fr-CA', null, { timeout: 10000 });
+  if (!/Voyage/.test(await page.textContent('#card-journey .mode-name'))) throw new Error('title not in French');
+  // Into a match, then Settings from the pause menu.
+  await press1(page.locator('#card-journey'));
+  await page.waitForSelector('#screen-journey.active', { state: 'visible' });
+  await press1(page.locator('#journey-grid .stage-cell').first());
+  await page.waitForSelector('#screen-setup.active', { state: 'visible' });
+  await press1(page.locator('#setup-start'));
+  await page.waitForSelector('#screen-game.active', { state: 'visible' });
+  await humanReady(page, 25000);
+  await press1(page.locator('#btn-pause'));
+  await page.waitForFunction(() => !document.getElementById('overlay-pause').hidden);
+  await press1(page.locator('#btn-pause-settings'));
+  await page.waitForFunction(() => !document.getElementById('overlay-settings').hidden);
+  await press1(page.locator('#tab-graphics'));
+  const choice = page.locator('#settings-body [data-game-language="choice"]');
+  await choice.scrollIntoViewIfNeeded();
+  const auto = (await choice.locator('option').first().textContent()).trim();
+  if (auto !== 'Automatique — Français (Canada)') throw new Error(`Automatic label not resolved: ${auto}`);
+  await choice.selectOption('it-IT');
+  await page.waitForFunction(() => document.documentElement.lang === 'it-IT');
+  await page.waitForFunction(() => /Salvato/.test(document.querySelector('[data-game-language="status"]').textContent));
+  if (calls.settings['ui.language']?.choice !== 'it-IT') throw new Error('ui.language not saved: ' + JSON.stringify(calls.settings));
+  if ((await page.textContent('#settings-h')).trim() !== 'Impostazioni') throw new Error('settings title not re-rendered');
+  if ((await page.textContent('#tab-graphics')).trim() !== 'Grafica') throw new Error('settings tabs not re-rendered');
+  if (!/Qualità/.test(await page.textContent('label[for="gfx-preset"]'))) throw new Error('graphics labels not re-rendered');
+  if ((await page.textContent('#hud-mode-name')).trim() !== 'Viaggio 1') throw new Error('HUD mode not re-rendered');
+  if (!/Incorona/.test(await page.textContent('#rail-objective'))) throw new Error('HUD objective not re-rendered');
+  if ((await page.textContent('#roll-label')).trim() !== 'Lancia') throw new Error('roll button not re-rendered');
+  // Report a problem (signed in only).
+  const title = page.locator('[data-game-report="title"]');
+  await title.scrollIntoViewIfNeeded();
+  await title.fill('Test report');
+  await press1(page.locator('[data-game-report="send"]'));
+  await page.waitForFunction(() => /Grazie/.test(document.querySelector('[data-game-report="status"]').textContent));
+  if (!calls.reports?.[0] || calls.reports[0].kind !== 'bug') throw new Error('report not posted');
+  const vp = page.viewportSize();
+  for (const sel of ['#settings-close', '[data-game-language="choice"]', '[data-game-report="send"]']) {
+    const b = await page.locator(sel).first().boundingBox();
+    if (!b || b.x < 0 || b.x + b.width > vp.width + 1) throw new Error(`${sel} cut off horizontally`);
+  }
+  await page.screenshot({ path: SHOT('language', name) });
+  await choice.selectOption('auto');
+  await page.waitForFunction(() => document.documentElement.lang === 'fr-CA');
+  await press1(page.locator('#settings-close'));
+  await page.waitForFunction(() => document.getElementById('overlay-settings').hidden);
+  // The match is untouched: back to it through the localized pause menu.
+  if ((await page.textContent('#btn-resume')).trim() !== 'Reprendre') throw new Error('pause menu not in French');
+  await press1(page.locator('#btn-resume'));
+  await humanReady(page, 20000);
+  await page.unroute(/\/api\/v1\//);
+  ok(`${name}: language — Automatic → fr-CA, Italian mid-match re-renders HUD + settings, ui.language saved, report posted`);
+}
+
 // ---------- one pass ----------
 async function runPass(browser, name, ctxOpts, { full }) {
   const errors = [];
@@ -390,6 +463,7 @@ async function runPass(browser, name, ctxOpts, { full }) {
       await page.screenshot({ path: SHOT('mobile-play', name) });
       ok(`${name}: real input advanced the round (${actions} action(s), picker=${sawPicker}, rail "${initialRT}" -> "${afterRT}")`);
     }
+    await languagePass(page, name, !full);
   } finally {
     await context.close();
   }
