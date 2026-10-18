@@ -80,7 +80,9 @@ const server = http.createServer(async (req, res) => {
     const p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
     const filePath = p === '/' ? path.join(ROOT, 'index.html') : path.join(ROOT, p);
     // Standalone the game must never call its own server.
-    if (/^\/(api|ws)(\/|$)/.test(p)) ownServerCalls.push(p);
+    // (A signed-in page's keepalive cloud-save flush on pagehide — fired as the hosted language pass's
+    // context closes — bypasses page.route; it carries the launch token, so it is not standalone traffic.)
+    if (/^\/(api|ws)(\/|$)/.test(p) && !req.headers.authorization) ownServerCalls.push(p);
     if (!filePath.startsWith(ROOT)) { res.writeHead(403).end('forbidden'); return; }
     const data = await readFile(filePath);
     res.writeHead(200, { 'Content-Type': MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream' });
@@ -236,6 +238,8 @@ async function graphicsPass(page, name, touch) {
   await page.selectOption('#gfx-preset', 'high');
   await presetIs('high');
   await page.waitForFunction(() => /2048² shadows/.test(document.getElementById('gfx-summary').textContent));
+  const summaryText = await page.textContent('#gfx-summary');
+  if (!/ · Level 0 · /.test(summaryText)) throw new Error(`summary lacks the hardware level: ${summaryText}`);
   // one override: bloom off
   await page.selectOption('#gfx-bloom', 'off');
   await page.waitForFunction(() => !/bloom/.test(document.getElementById('gfx-summary').textContent.split('·').slice(1).join('·')));

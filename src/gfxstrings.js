@@ -7,6 +7,7 @@ import { getLang } from './i18n.js';
 
 const EN = {
   quality: 'Quality',
+  level: 'Level {n}',
   auto: 'Auto (detected: {tier})',
   renderScale: 'Render scale',
   fromPreset: 'From preset ({tier})',
@@ -34,6 +35,7 @@ const GB = {
 
 const ES = {
   quality: 'Calidad',
+  level: 'Nivel {n}',
   auto: 'Automática (detectada: {tier})',
   renderScale: 'Escala de renderizado',
   fromPreset: 'Según el ajuste ({tier})',
@@ -61,6 +63,7 @@ const ES_419 = {
 
 const DE = {
   quality: 'Qualität',
+  level: 'Stufe {n}',
   auto: 'Automatisch (erkannt: {tier})',
   renderScale: 'Renderskalierung',
   fromPreset: 'Laut Voreinstellung ({tier})',
@@ -83,6 +86,7 @@ const DE = {
 
 const FR = {
   quality: 'Qualité',
+  level: 'Niveau {n}',
   auto: 'Auto (détectée : {tier})',
   renderScale: 'Échelle de rendu',
   fromPreset: 'Selon le préréglage ({tier})',
@@ -111,6 +115,7 @@ const FR_CA = {
 
 const PT_BR = {
   quality: 'Qualidade',
+  level: 'Nível {n}',
   auto: 'Automática (detectada: {tier})',
   renderScale: 'Escala de renderização',
   fromPreset: 'Conforme a predefinição ({tier})',
@@ -133,6 +138,7 @@ const PT_BR = {
 
 const IT = {
   quality: 'Qualità',
+  level: 'Livello {n}',
   auto: 'Automatica (rilevata: {tier})',
   renderScale: 'Scala di rendering',
   fromPreset: 'Da preimpostazione ({tier})',

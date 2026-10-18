@@ -492,7 +492,7 @@ function buildGraphicsFields(body, save) {
   function refreshSummary() {
     const i = info();
     if (!i) { summary.textContent = ''; return; }
-    summary.textContent = `${i.gpu} · ${i.summary}`;
+    summary.textContent = [i.gpu, i.level != null ? L.level.replace('{n}', i.level) : null, i.summary].filter(Boolean).join(' · ');
     summary.dataset.preset = i.resolved?.preset || '';
     note.hidden = !i.postFailed;
   }

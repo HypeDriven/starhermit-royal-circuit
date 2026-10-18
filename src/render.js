@@ -30,8 +30,8 @@ import { SMAAPass } from '../vendor/addons/postprocessing/SMAAPass.js';
 import { FXAAShader } from '../vendor/addons/shaders/FXAAShader.js';
 import { RoomEnvironment } from '../vendor/addons/environments/RoomEnvironment.js';
 import {
-  detectPreset, resolve as resolveGfx, describe as describeGfx,
-  SHADOW_MAP, PARTICLE_CAP, MOTES,
+  detectLevel, presetForLevel, resolve as resolveGfx, describe as describeGfx,
+  SHADOW_MAP, PARTICLE_MAX, MOTE_MAX, particleCap, moteCount,
 } from './gfx.js';
 import {
   TRACK_LEN, DONE, SAFE_CELLS, PLAYER_DEFS, startCell,
@@ -79,10 +79,13 @@ function seededRand(seed) {
   };
 }
 
-function canvasTex(size, draw, { repeat = 1, srgb = true } = {}) {
+// `size` is the authored canvas size the drawing uses; `px` the preset's texture budget it is drawn into.
+function canvasTex(size, draw, { repeat = 1, srgb = true, px = size } = {}) {
   const c = document.createElement('canvas');
-  c.width = c.height = size;
-  draw(c.getContext('2d'), size);
+  c.width = c.height = px;
+  const g = c.getContext('2d');
+  g.scale(px / size, px / size);
+  draw(g, size);
   const t = new THREE.CanvasTexture(c);
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
@@ -92,7 +95,7 @@ function canvasTex(size, draw, { repeat = 1, srgb = true } = {}) {
 }
 
 // Lacquered tile: bright field, darker bevel edge and a fine gold-line inlay.
-function tileTexture() {
+function tileTexture(px = 128) {
   return canvasTex(128, (g, n) => {
     const rnd = seededRand(7);
     g.fillStyle = '#d8d4de';
@@ -113,10 +116,10 @@ function tileTexture() {
     g.strokeStyle = 'rgba(255,236,190,0.75)';
     g.lineWidth = 2;
     g.strokeRect(14, 14, n - 28, n - 28);
-  });
+  }, { px });
 }
 
-function woodTexture() {
+function woodTexture(px = 256) {
   return canvasTex(256, (g, n) => {
     const rnd = seededRand(11);
     g.fillStyle = '#d9cfc6';
@@ -131,11 +134,11 @@ function woodTexture() {
       for (let x = 0; x <= n; x += 16) g.lineTo(x, y + Math.sin(x / 40 + i) * 3 + (rnd() - 0.5) * 2);
       g.stroke();
     }
-  }, { repeat: 3 });
+  }, { repeat: 3, px });
 }
 
 // Plaza flagstones for the pavilion floor.
-function stoneTexture() {
+function stoneTexture(px = 256) {
   return canvasTex(256, (g, n) => {
     const rnd = seededRand(23);
     g.fillStyle = '#8f8a98';
@@ -155,7 +158,37 @@ function stoneTexture() {
       g.fillStyle = `rgba(${v},${v},${v},0.06)`;
       g.fillRect(rnd() * n, rnd() * n, 2, 2);
     }
-  }, { repeat: 9 });
+  }, { repeat: 9, px });
+}
+
+// Run a post pass at a fraction of the frame: EffectComposer.addPass/setSize hand every pass the full
+// frame size, so the pass's own setSize applies the budget's scale (half-res bloom/GTAO below Ultra).
+function atScale(pass, k) {
+  if (!(k < 1)) return pass;
+  const setSize = pass.setSize.bind(pass);
+  pass.setSize = (w, h) => setSize(Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k)));
+  return pass;
+}
+
+// The preset budget's shading model for a lit surface: Lambert (Low), Standard (Balanced) or Physical
+// (High, Ultra). Clear-coated Physical surfaces step down to Standard and Lambert; plain Standard
+// surfaces become Lambert on Low only. Colour, maps, emissive and transparency carry over.
+const SHADING = { lambert: 0, standard: 1, physical: 2 };
+function shadeAs(old, tier) {
+  const authored = old.userData.authored || (old.isMeshPhysicalMaterial ? 'physical' : 'standard');
+  const want = Math.min(SHADING[tier], SHADING[authored]);
+  const cls = want === 0 ? THREE.MeshLambertMaterial : want === 1 ? THREE.MeshStandardMaterial : THREE.MeshPhysicalMaterial;
+  if (old.constructor === cls) return old;
+  const m = new cls();
+  for (const k of ['map', 'transparent', 'opacity', 'depthWrite', 'side', 'name', 'vertexColors']) m[k] = old[k];
+  m.color.copy(old.color);
+  m.emissive.copy(old.emissive); m.emissiveIntensity = old.emissiveIntensity;
+  const pbr = old.userData.pbr || { roughness: old.roughness, metalness: old.metalness, envMapIntensity: old.envMapIntensity, clearcoat: old.clearcoat || 0, clearcoatRoughness: old.clearcoatRoughness || 0 };
+  if (want >= 1) { m.roughness = pbr.roughness; m.metalness = pbr.metalness; m.envMapIntensity = pbr.envMapIntensity; }
+  if (want === 2) { m.clearcoat = pbr.clearcoat; m.clearcoatRoughness = pbr.clearcoatRoughness; }
+  m.userData = { authored, pbr };
+  old.dispose();
+  return m;
 }
 
 // Soft round sprite for particles and motes.
@@ -203,13 +236,22 @@ export function createRenderer(canvas, opts = {}) {
   const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 200);
   const mobile = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
   const gpu = gpuName(renderer);
+  // StarHermit hardware level (src/gpu-level.js): renderer string + device facts (phone/tablet, cores, memory).
+  let sys = { mobile, webgl2: !!renderer.capabilities.isWebGL2 };
+  try {
+    const SG = globalThis.StarHermitGpu;
+    if (SG) { const d = SG.detectSystem(); sys = { ...sys, mobile: mobile || d.mobile, touch: d.touch, screen: d.screen, cores: d.cores, memoryGb: d.memoryGb, astc: d.astc }; }
+  } catch { /* defaults */ }
+  const gpuLevel = detectLevel(gpu, sys);
 
   const R = {
     canvas, renderer, scene, camera,
     theme: opts.theme || null,
     reducedMotion: !!opts.reducedMotion,
     gpu,
-    detected: detectPreset(gpu, { mobile }),
+    gpuLevel,
+    detected: presetForLevel(gpuLevel),
+    budget: null,            // applied per-preset asset budget (gfx.js BUDGETS)
     q: null,                 // resolved graphics settings (gfx.js)
     composer: null,
     gradePass: null,
@@ -277,25 +319,40 @@ export function createRenderer(canvas, opts = {}) {
     color: d.color, roughness: 0.55, transparent: true, opacity: 0.88, envMapIntensity: 0.12,
   }));
 
+  // Curved geometry at the preset's segment share (k × the authored segment counts).
+  const seg = (n, k, min = 3) => Math.max(min, Math.round(n * k));
+  const curved = (k) => ({
+    sky: new THREE.SphereGeometry(95, seg(32, k, 12), seg(16, k, 8)),
+    rims: [RING_RADIUS - 0.95, RING_RADIUS + 0.95, WORKSHOP_RADIUS + 2.2].map((r) => new THREE.TorusGeometry(r, 0.11, seg(8, k, 4), seg(96, k, 24))),
+    dais: new THREE.CylinderGeometry(2.3, 2.6, 0.55, seg(32, k, 12)),
+    lanternBall: new THREE.SphereGeometry(0.3, seg(14, k, 8), seg(12, k, 6)),
+    ring: new THREE.RingGeometry(0.5, 0.78, seg(32, k, 12)),
+    safeInlay: new THREE.RingGeometry(0.46, 0.56, seg(28, k, 12)),
+    round: new THREE.SphereGeometry(0.44, seg(24, k, 10), seg(18, k, 8)),
+    floatBase: new THREE.CylinderGeometry(0.52, 0.58, 0.14, seg(20, k, 8)),
+    ground: new THREE.CircleGeometry(30, seg(64, k, 24)),
+    boardBase: new THREE.CylinderGeometry(WORKSHOP_RADIUS + 2.2, WORKSHOP_RADIUS + 2.6, 0.5, seg(72, k, 24)),
+  });
+  let curve = curved(1);
+  curve.k = 1;
   const G = {
     tile: new THREE.BoxGeometry(TILE_SIZE, 0.24, 1.7),
     step: new THREE.BoxGeometry(1.15, 0.16, 1.15),
     pad: new THREE.BoxGeometry(2.9, 0.18, 2.9),
-    dais: new THREE.CylinderGeometry(2.3, 2.6, 0.55, 32),
+    dais: curve.dais,
     pillar: new THREE.CylinderGeometry(0.14, 0.14, 2.6, 10),
     roof: new THREE.ConeGeometry(3.1, 1.6, 8),
-    lanternBall: new THREE.SphereGeometry(0.3, 14, 12),
+    lanternBall: curve.lanternBall,
     lanternPost: new THREE.CylinderGeometry(0.06, 0.06, 1.5, 6),
-    ring: new THREE.RingGeometry(0.5, 0.78, 32),
-    safeInlay: new THREE.RingGeometry(0.46, 0.56, 28),
-    rim: (r) => new THREE.TorusGeometry(r, 0.11, 8, 96),
+    ring: curve.ring,
+    safeInlay: curve.safeInlay,
     float: {
-      round: new THREE.SphereGeometry(0.44, 24, 18),
+      round: curve.round,
       square: new THREE.BoxGeometry(0.72, 0.72, 0.72),
       tri: new THREE.ConeGeometry(0.5, 0.95, 3),
       hex: new THREE.CylinderGeometry(0.46, 0.46, 0.55, 6),
     },
-    floatBase: new THREE.CylinderGeometry(0.52, 0.58, 0.14, 20),
+    floatBase: curve.floatBase,
     die: new THREE.BoxGeometry(0.9, 0.9, 0.9),
     bulb: new THREE.SphereGeometry(0.075, 8, 6),
   };
@@ -361,25 +418,24 @@ export function createRenderer(canvas, opts = {}) {
         gl_FragColor = vec4(c, 1.0);
       }`,
   });
-  const sky = new THREE.Mesh(new THREE.SphereGeometry(95, 32, 16), skyMat);
+  const sky = new THREE.Mesh(curve.sky, skyMat);
   sky.renderOrder = -1;
   sky.frustumCulled = false;
   sky.raycast = () => {};
   envLayer.add(sky);
 
   // ground + board base
-  const ground = new THREE.Mesh(new THREE.CircleGeometry(30, 64), M.ground);
+  const ground = new THREE.Mesh(curve.ground, M.ground);
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.32;
   ground.receiveShadow = true;
-  const boardBase = new THREE.Mesh(
-    new THREE.CylinderGeometry(WORKSHOP_RADIUS + 2.2, WORKSHOP_RADIUS + 2.6, 0.5, 72), M.wood);
+  const boardBase = new THREE.Mesh(curve.boardBase, M.wood);
   boardBase.position.y = -0.26;
   boardBase.receiveShadow = true;
   // gold rims framing the circuit (the tiles themselves stay fully visible)
-  const rimIn = new THREE.Mesh(G.rim(RING_RADIUS - 0.95), M.trim);
-  const rimOut = new THREE.Mesh(G.rim(RING_RADIUS + 0.95), M.trim);
-  const rimEdge = new THREE.Mesh(G.rim(WORKSHOP_RADIUS + 2.2), M.trim);
+  const rimIn = new THREE.Mesh(curve.rims[0], M.trim);
+  const rimOut = new THREE.Mesh(curve.rims[1], M.trim);
+  const rimEdge = new THREE.Mesh(curve.rims[2], M.trim);
   for (const rim of [rimIn, rimOut, rimEdge]) {
     rim.rotation.x = Math.PI / 2;
     rim.position.y = 0.0;
@@ -686,7 +742,7 @@ export function createRenderer(canvas, opts = {}) {
   /* ---------------------------------------------------------------- */
   /* particle pool (fx layer; never raycast)                           */
   /* ---------------------------------------------------------------- */
-  const MAXP = PARTICLE_CAP.high;
+  const MAXP = PARTICLE_MAX; // pool built at the largest budget; the preset uses particleCap() of it
   const pGeo = new THREE.BufferGeometry();
   const pPos = new Float32Array(MAXP * 3);
   const pCol = new Float32Array(MAXP * 3);
@@ -706,7 +762,7 @@ export function createRenderer(canvas, opts = {}) {
   function burst(pos, colorHex, n = 18, speed = 3.2) {
     if (R.reducedMotion) return;
     const col = new THREE.Color(colorHex);
-    const cap = PARTICLE_CAP[R.q?.particles] || PARTICLE_CAP.low;
+    const cap = R.q ? particleCap(R.q) : 40;
     for (let k = 0; k < n && pFree.length; k++) {
       const i = pFree.pop();
       if (i >= cap) continue;
@@ -747,7 +803,7 @@ export function createRenderer(canvas, opts = {}) {
 
   // ambient lantern motes: warm embers drifting up around the circuit
   // (cosmetic, additive, never raycast; frozen with reduced motion)
-  const MAXM = MOTES.high;
+  const MAXM = MOTE_MAX; // built at the largest budget; the preset draws moteCount() of them
   const mGeo = new THREE.BufferGeometry();
   const mPos = new Float32Array(MAXM * 3);
   const mSeed = [];
@@ -990,13 +1046,64 @@ export function createRenderer(canvas, opts = {}) {
     M.ground, M.wood, M.trim, M.tileA, M.tileB, M.post, ...playerMats, ...playerLaneMats, ...dieMats,
   ];
 
+  // Swap every scene reference (and the shared M / G / playerMats / dieMats tables later meshes are built
+  // from) from old materials and geometries to the preset's variants.
+  function swapRefs(mats, geos) {
+    const sub = (m) => mats.get(m) || m;
+    scene.traverse((o) => {
+      if (o.material) o.material = Array.isArray(o.material) ? o.material.map(sub) : sub(o.material);
+      if (o.geometry && geos.has(o.geometry)) o.geometry = geos.get(o.geometry);
+    });
+    for (const k of Object.keys(M)) M[k] = sub(M[k]);
+    playerMats.forEach((m, i) => { playerMats[i] = sub(m); });
+    dieMats.forEach((m, i) => { dieMats[i] = sub(m); });
+    for (const [k, v] of Object.entries(G)) if (geos.has(v)) G[k] = geos.get(v);
+    for (const [k, v] of Object.entries(G.float)) if (geos.has(v)) G.float[k] = geos.get(v);
+    for (const old of geos.keys()) old.dispose();
+  }
+
+  /** Per-preset assets (gfx.js BUDGETS): shading model, texture sizes, curve detail. True when shading changed. */
+  function applyBudget(b) {
+    const prev = R.budget || { material: 'physical', texture: 256, segments: 1 };
+    R.budget = b;
+    if (b.texture !== prev.texture) {
+      const next = { tile: tileTexture(b.texture / 2), wood: woodTexture(b.texture), stone: stoneTexture(b.texture) };
+      for (const m of [M.tileA, M.tileB, M.wood, M.ground]) {
+        for (const k of ['tile', 'wood', 'stone']) if (m.map === TEX[k]) m.map = next[k];
+      }
+      for (const k of ['tile', 'wood', 'stone']) { TEX[k].dispose(); TEX[k] = next[k]; }
+    }
+    const geos = new Map();
+    if (b.segments !== curve.k) {
+      const next = curved(b.segments);
+      next.k = b.segments;
+      for (const k of Object.keys(next)) {
+        if (k === 'k') continue;
+        if (k === 'rims') curve.rims.forEach((g, i) => geos.set(g, next.rims[i]));
+        else geos.set(curve[k], next[k]);
+      }
+      curve = next;
+    }
+    const mats = new Map();
+    if (b.material !== prev.material) {
+      for (const m of [M.ground, M.wood, M.trim, M.tileA, M.tileB, M.lantern, M.post, M.die, ...playerMats, ...playerLaneMats, ...dieMats]) {
+        const n = shadeAs(m, b.material);
+        if (n !== m) mats.set(m, n);
+      }
+      playerLaneMats.forEach((m, i) => { playerLaneMats[i] = mats.get(m) || m; });
+    }
+    if (mats.size || geos.size) swapRefs(mats, geos);
+    return mats.size > 0;
+  }
+
   /** Apply saved graphics settings ({ preset, render_scale, <category>, ... }). */
   function setGraphics(saved) {
     const json = JSON.stringify(saved || {});
     if (json === R.gfxJson) return; // unrelated settings changed
     R.gfxJson = json;
-    const g = resolveGfx(saved || {}, R.detected);
+    const g = resolveGfx(saved || {}, R.detected, R.gpuLevel);
     R.q = g;
+    const tierChanged = applyBudget(g.budget);
     canvas.dataset.gfxPreset = g.preset;
     document.body.dataset.gfxPreset = g.preset;
 
@@ -1009,7 +1116,7 @@ export function createRenderer(canvas, opts = {}) {
       key.shadow.mapSize.set(size, size);
       if (key.shadow.map) { key.shadow.map.dispose(); key.shadow.map = null; }
     }
-    if (wasOn !== size > 0) for (const m of shadowMats()) m.needsUpdate = true;
+    if (wasOn !== size > 0 || tierChanged) for (const m of shadowMats()) m.needsUpdate = true;
 
     // reflections (image-based lighting)
     scene.environment = g.reflections === 'on' ? environmentMap() : null;
@@ -1027,8 +1134,8 @@ export function createRenderer(canvas, opts = {}) {
     festoon.visible = detailed;
 
     // particles + ambient motion
-    mGeo.setDrawRange(0, g.ambience === 'animated' ? MOTES[g.particles] : 0);
-    motes.visible = g.ambience === 'animated' && MOTES[g.particles] > 0;
+    mGeo.setDrawRange(0, moteCount(g));
+    motes.visible = moteCount(g) > 0;
 
     // adaptive resolution restarts; post chain rebuilds on the next frame
     R.adaptiveScale = 1;
@@ -1043,6 +1150,7 @@ export function createRenderer(canvas, opts = {}) {
     const px = [Math.round(R.size[0] * R.pixelRatio), Math.round(R.size[1] * R.pixelRatio)];
     return {
       gpu: R.gpu || 'unknown GPU',
+      level: R.gpuLevel,
       detected: R.detected,
       resolved: R.q,
       summary: describeGfx(R.q, px),
@@ -1098,11 +1206,11 @@ export function createRenderer(canvas, opts = {}) {
         const hi = g.ao === 'high';
         ao.updateGtaoMaterial({ radius: 0.9, distanceExponent: 1.5, thickness: 1.5, scale: 1.0, samples: hi ? 16 : 8 });
         ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: hi ? 6 : 4, rings: 2, samples: hi ? 16 : 8 });
-        composer.addPass(ao);
+        composer.addPass(atScale(ao, g.budget.aoRes));
       }
       if (g.bloom === 'on') {
         // high threshold: only lanterns, festoon bulbs and bright highlights bloom
-        composer.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 0.42, 0.4, 0.92));
+        composer.addPass(atScale(new UnrealBloomPass(new THREE.Vector2(w, h), 0.42, 0.4, 0.92), g.budget.bloomRes));
       }
       composer.addPass(new OutputPass());
       if (g.grade === 'on') {
