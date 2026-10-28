@@ -1,0 +1,232 @@
+/* Royal Circuit — the browser build's styles.css rewritten class-based for
+   the engine's UI (`npm run css` converts it into assets/ui-style.json).
+   Element and id selectors, body classes (large-text, high-contrast,
+   palette-cvd, left-handed) and @media do not convert: every widget names its
+   classes, the breakpoints are layouts picked in native/screens.ts, high
+   contrast and the CVD accent are token sets native/style.ts applies, larger
+   text is the runtime's text scale, and the left-handed tray is the game's
+   option. The gold title gradient text is a flat gold (text takes one colour). */
+
+:root {
+  --accent: #e8b04b; --accent-hi: #ffd98a; --ink: #241703; --bg: #141026;
+  --panel: rgba(24, 18, 44, 0.92); --hud: rgba(20, 14, 40, 0.78); --text: #f2ecdf; --muted: #b8aecb;
+  --danger: #e05a4e; --danger-text: #ffb4ac; --ok: #5ecf8a; --ring: #ffd98a;
+  --edge: rgba(255, 255, 255, 0.18); --glass: rgba(255, 255, 255, 0.08); --glass-hi: rgba(255, 255, 255, 0.14);
+}
+
+* { box-sizing: border-box; }
+
+/* ------------------------------------------------------------- text */
+.text { color: var(--text); font-size: 16px; }
+.muted { color: var(--muted); font-size: 16px; }
+.small { color: var(--muted); font-size: 13px; }
+.hint-line { color: var(--muted); font-size: 13px; }
+.game-title { color: var(--accent); font-size: 58px; font-weight: 800; letter-spacing: 2px; text-align: center; }
+.game-title-sm { color: var(--accent); font-size: 36px; font-weight: 800; letter-spacing: 1.4px; text-align: center; }
+.logo { font-size: 72px; text-align: center; }
+.logo-sm { font-size: 40px; text-align: center; }
+.tagline { color: var(--muted); font-size: 16px; text-align: center; }
+.h2 { color: var(--text); font-size: 24px; font-weight: 700; }
+.h3 { color: var(--accent); font-size: 18px; font-weight: 700; }
+.field-label { color: var(--text); font-size: 16px; font-weight: 650; }
+.mode-icon { font-size: 24px; }
+.mode-name { color: var(--text); font-size: 17px; font-weight: 750; }
+.mode-sub { color: var(--muted); font-size: 13px; }
+.ci-icon { font-size: 26px; }
+.ci-title { color: var(--text); font-size: 16px; font-weight: 700; }
+.ci-sub { color: var(--muted); font-size: 13px; }
+.ci-meta { color: var(--accent); font-size: 13px; }
+.stage-num { color: var(--text); font-size: 18px; font-weight: 800; text-align: center; }
+.stage-stars { color: var(--accent); font-size: 13px; text-align: center; }
+.stage-name { color: var(--muted); font-size: 10.5px; text-align: center; }
+.sum-k { color: var(--accent); font-size: 14px; font-weight: 700; }
+.sum-v { color: var(--text); font-size: 14px; }
+.hud-mode { color: var(--accent); font-size: 14px; font-weight: 700; letter-spacing: 0.84px; text-transform: uppercase; }
+.hud-obj { color: var(--text); font-size: 13px; }
+.chip-name { color: var(--text); font-size: 13px; }
+.chip-crowns { color: var(--accent); font-size: 13px; font-weight: 700; }
+.rail-h { color: var(--accent); font-size: 12px; font-weight: 700; letter-spacing: 0.96px; text-transform: uppercase; }
+.rail-text { color: var(--text); font-size: 13px; }
+.rail-muted { color: var(--muted); font-size: 13px; }
+.rail-turn { color: var(--text); font-size: 13px; font-weight: 700; text-align: center; }
+.rail-die { color: var(--text); font-size: 44px; text-align: center; }
+.roll-label { color: var(--ink); font-size: 18px; font-weight: 800; }
+.roll-die { color: var(--ink); font-size: 26px; }
+.coach-text { color: var(--text); font-size: 15px; text-align: center; }
+.banner-text { color: var(--text); font-size: 16px; font-weight: 700; text-align: center; }
+.caption-text { color: #ffe9b8; font-size: 13px; }
+.toast-text { color: var(--text); font-size: 14px; }
+.big { color: var(--text); font-size: 30px; font-weight: 800; text-align: center; }
+.th { color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; }
+.td { color: var(--text); font-size: 14px; }
+.td-win { color: #ffe9b8; font-size: 14px; font-weight: 700; }
+.breakdown { color: var(--muted); font-size: 12.5px; }
+.goal-met-text { color: var(--ok); font-size: 13px; font-weight: 700; }
+.goal-missed-text { color: var(--danger-text); font-size: 13px; font-weight: 700; }
+.hc-icon { font-size: 26px; }
+.bs-h { color: var(--accent); font-size: 16px; font-weight: 700; }
+.wrap { color: var(--text); font-size: 16px; font-weight: 650; text-align: center; }
+.wrap-ink { color: var(--ink); font-size: 16px; font-weight: 700; text-align: center; }
+
+/* ------------------------------------------------------------- surfaces */
+.panel { background: var(--panel); border: 1px solid rgba(232, 176, 75, 0.25); border-radius: 14px; padding: 20px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.5); }
+.mode-card-box { background: var(--panel); border: 1px solid rgba(232, 176, 75, 0.22); border-radius: 14px; }
+.summary { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(232, 176, 75, 0.35); border-radius: 10px; padding: 12px 14px; }
+.hud-box { background: rgba(20, 14, 40, 0.72); border-radius: 12px; padding: 8px 14px; }
+.hud-chip { background: rgba(20, 14, 40, 0.72); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 999px; padding: 6px 12px; }
+.hud-chip-on { background: rgba(20, 14, 40, 0.72); border: 2px solid var(--accent); border-radius: 999px; padding: 5px 11px;
+  box-shadow: 0 0 0 2px rgba(232, 176, 75, 0.35); }
+.rail { background: var(--hud); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; padding: 14px 16px; }
+.tray { background: rgba(20, 14, 40, 0.8); border: 1px solid rgba(232, 176, 75, 0.3); border-radius: 999px; padding: 10px 14px; }
+.tray-sq { background: rgba(20, 14, 40, 0.8); border: 1px solid rgba(232, 176, 75, 0.3); border-radius: 18px; padding: 10px 14px; }
+.coach { background: rgba(35, 26, 8, 0.92); border: 1px solid var(--accent); border-radius: 12px; padding: 12px 20px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5); }
+.banner { background: rgba(20, 14, 40, 0.85); border: 1px solid rgba(232, 176, 75, 0.35); border-radius: 999px; padding: 8px 22px; }
+.caption { background: rgba(0, 0, 0, 0.72); border-radius: 8px; padding: 6px 14px; }
+.toast { background: rgba(20, 14, 40, 0.95); border: 1px solid var(--accent); border-radius: 10px; padding: 10px 16px; }
+.toast-error { background: rgba(20, 14, 40, 0.95); border: 1px solid var(--danger); border-radius: 10px; padding: 10px 16px; }
+.goal-met { background: rgba(94, 207, 138, 0.18); border: 1px solid var(--ok); border-radius: 999px; padding: 4px 12px; }
+.goal-missed { background: rgba(224, 90, 78, 0.15); border: 1px solid var(--danger); border-radius: 999px; padding: 4px 12px; }
+.help-card { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; padding: 14px; }
+.row-line { border-bottom: 1px solid rgba(255, 255, 255, 0.09); border-radius: 0; padding: 8px 4px; }
+.tab-line { border-bottom: 1px solid rgba(255, 255, 255, 0.12); border-radius: 0; }
+.field-line { border-bottom: 1px solid rgba(255, 255, 255, 0.07); border-radius: 0; padding: 0 0 12px 0; }
+.dot-mark { border: 2px solid rgba(255, 255, 255, 0.5); border-radius: 999px; }
+
+/* ------------------------------------------------------------- buttons */
+.btn {
+  min-height: 44px; min-width: 44px; padding: 12px 20px;
+  background: var(--glass); border: 1px solid var(--edge); border-radius: 12px;
+  color: var(--text); font-size: 16px; font-weight: 650; text-align: center;
+}
+.btn:hover { background: var(--glass-hi); }
+.btn:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+.btn:disabled { opacity: 0.45; }
+.btn-primary {
+  min-height: 44px; min-width: 44px; padding: 12px 20px;
+  background: var(--accent); border: 1px solid var(--accent); border-radius: 12px;
+  color: var(--ink); font-size: 16px; font-weight: 700; text-align: center;
+}
+.btn-primary:hover { background: #f5c46a; }
+.btn-primary:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+.btn-primary:disabled { opacity: 0.45; }
+.btn-ghost {
+  min-height: 44px; min-width: 44px; padding: 12px 20px;
+  background: transparent; border: 1px solid var(--edge); border-radius: 12px;
+  color: var(--text); font-size: 16px; font-weight: 650; text-align: center;
+}
+.btn-ghost:hover { background: var(--glass-hi); }
+.btn-ghost:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+.btn-ghost:disabled { opacity: 0.45; }
+.btn-danger {
+  min-height: 44px; min-width: 44px; padding: 12px 20px;
+  background: var(--glass); border: 1px solid var(--danger); border-radius: 12px;
+  color: var(--danger-text); font-size: 16px; font-weight: 650; text-align: center;
+}
+.btn-danger:hover { background: var(--glass-hi); }
+.btn-danger:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+.btn-play {
+  min-height: 56px; padding: 18px 66px;
+  background: linear-gradient(180deg, #ffd98a, #e8b04b); border: 1px solid transparent; border-radius: 999px;
+  color: var(--ink); font-size: 28px; font-weight: 800; letter-spacing: 0.84px; text-align: center;
+  box-shadow: 0 10px 40px rgba(232, 176, 75, 0.4);
+}
+.btn-play:hover { background: linear-gradient(180deg, #ffe4a8, #f0bd5c); }
+.btn-play:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+.chip {
+  min-height: 44px; padding: 9px 16px;
+  background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 999px;
+  color: var(--text); font-size: 16px; font-weight: 500; text-align: center;
+}
+.chip:hover { background: var(--glass-hi); }
+.chip:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+.icon-btn {
+  min-height: 44px; min-width: 44px; padding: 4px;
+  background: rgba(20, 14, 40, 0.75); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 12px;
+  color: var(--text); font-size: 20px; text-align: center;
+}
+.icon-btn:hover { background: rgba(40, 30, 70, 0.85); }
+.icon-btn:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+.mode-card {
+  min-height: 96px; padding: 14px 16px;
+  background: var(--panel); border: 1px solid rgba(232, 176, 75, 0.22); border-radius: 14px;
+  color: var(--text); font-size: 16px; text-align: start;
+}
+.mode-card:hover { border-color: var(--accent); }
+.mode-card:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+.seg {
+  min-height: 44px; min-width: 44px; padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.07); border: 1px solid var(--edge); border-radius: 10px;
+  color: var(--text); font-size: 16px; font-weight: 500; text-align: center;
+}
+.seg:hover { background: var(--glass-hi); }
+.seg:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+.seg.active { background: var(--accent); border-color: transparent; color: var(--ink); font-weight: 700; }
+.tab {
+  min-height: 44px; padding: 10px 14px;
+  background: transparent; border: 0 solid transparent; border-bottom: 3px solid transparent; border-radius: 0;
+  color: var(--muted); font-size: 16px; text-align: center;
+}
+.tab:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+.tab.active { color: var(--text); border-bottom: 3px solid var(--accent); font-weight: 700; }
+.stage-cell {
+  min-height: 78px; padding: 10px 6px;
+  background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px;
+  color: var(--text); font-size: 16px; text-align: center;
+}
+.stage-cell:hover { border-color: var(--accent); }
+.stage-cell:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+.stage-cell:disabled { opacity: 0.38; }
+.stage-cell-mastery {
+  min-height: 78px; padding: 10px 6px;
+  background: rgba(232, 176, 75, 0.08); border: 1px solid rgba(232, 176, 75, 0.6); border-radius: 12px;
+  color: var(--text); font-size: 16px; text-align: center;
+}
+.stage-cell-mastery:hover { border-color: var(--accent); }
+.stage-cell-mastery:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+.stage-cell-mastery:disabled { opacity: 0.38; }
+.card-item {
+  min-height: 44px; padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px;
+  color: var(--text); font-size: 16px; text-align: start;
+}
+.card-item:hover { border-color: var(--accent); }
+.card-item:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+.card-item:disabled { opacity: 0.45; }
+.card-item-done {
+  min-height: 44px; padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(94, 207, 138, 0.5); border-radius: 12px;
+  color: var(--text); font-size: 16px; text-align: start;
+}
+.card-item-done:hover { border-color: var(--accent); }
+.card-item-done:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+.btn-roll {
+  min-height: 48px; padding: 12px 26px;
+  background: linear-gradient(180deg, #ffd98a, #e8b04b); border: 1px solid transparent; border-radius: 999px;
+  color: var(--ink); font-size: 18px; font-weight: 800; text-align: center;
+}
+.btn-roll:hover { background: linear-gradient(180deg, #ffe4a8, #f0bd5c); }
+.btn-roll:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+.btn-roll:disabled { opacity: 0.45; }
+.btn-pick {
+  min-height: 44px; padding: 10px 14px;
+  background: rgba(20, 14, 40, 0.88); border: 2px solid var(--accent); border-radius: 12px;
+  color: var(--text); font-size: 16px; font-weight: 650; text-align: center;
+}
+.btn-pick:hover { background: rgba(50, 38, 90, 0.92); }
+.btn-pick:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+.btn-pick.active { background: rgba(70, 52, 20, 0.95); border-color: var(--accent-hi); }
+.btn-rail {
+  min-height: 40px; padding: 6px 8px;
+  background: transparent; border: 1px solid var(--edge); border-radius: 12px;
+  color: var(--text); font-size: 13px; font-weight: 650; text-align: center;
+}
+.btn-rail:hover { background: var(--glass-hi); }
+.btn-rail:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+.btn-rail.active { background: rgba(232, 176, 75, 0.2); border-color: var(--accent); }
+.check {
+  min-height: 44px; min-width: 44px; padding: 0;
+  background: transparent; border: 0 solid transparent; border-radius: 6px;
+}
+.check:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }

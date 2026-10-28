@@ -5,14 +5,18 @@
  * future-version payloads never crash the game: they are quarantined and a
  * fresh document is issued. No credentials or private data are ever stored
  * here. Migration tests live in tests/save.test.mjs.
+ *
+ * On the StarHermit engine the progression lives in the runtime's save
+ * (native/platform.ts); `localStorage` is the engine client's device
+ * key/value shim, so the in-progress match snapshot stays on this device as
+ * before. readForeign() reads the browser build's cloud slot (game:<slug>,
+ * this wrapped document) for the one-time migration.
  */
 
 import { hashString } from './rng.js';
-import { migrateGraphics } from './gfx.js';
 
 export const SAVE_VERSION = 1;
 const KEY = 'royal-circuit:save:v1';
-const SETTINGS_KEY = 'royal-circuit:settings:v1';
 
 export function defaultSave() {
   return {
@@ -24,24 +28,6 @@ export function defaultSave() {
     stats: { gamesPlayed: 0, gamesWon: 0, captures: 0, crowned: 0, streakDays: 0, lastDaily: null },
     leaderboards: { daily: [], best: [] }, // local boards; platform boards are read-only
     ratings: { circuit: 1000 },
-  };
-}
-
-export function defaultSettings() {
-  return {
-    audio: { music: 0.7, effects: 0.9, ambience: 0.6, voice: 0.8, muted: false },
-    // gfx.js model: preset auto|low|balanced|high|ultra, per-category overrides
-    graphics: { preset: 'auto', render_scale: 1, adaptive: true, show_fps: false },
-    accessibility: {
-      reducedMotion: false, highContrast: false, largeText: false,
-      palette: 'standard', leftHanded: false, holdToConfirm: false,
-      timingAssist: false, haptics: true, captions: true,
-    },
-    camera: { mode: 'auto' }, // auto | top | low
-    input: { bindings: null }, // player overrides for desktop bindings
-    theme: 'lantern-pavilion',
-    tutorial: { seenIntro: false },
-    consent: { analytics: false },
   };
 }
 
@@ -152,26 +138,6 @@ export function serializeSave(save) {
 export function parseDoc(doc) {
   return unwrap(doc);
 }
-export function loadSettings() {
-  const s = read(SETTINGS_KEY);
-  // merge over defaults so new settings keys appear automatically
-  const d = defaultSettings();
-  if (!s) return d;
-  return {
-    ...d, ...s,
-    audio: { ...d.audio, ...(s.audio || {}) },
-    graphics: { ...d.graphics, ...migrateGraphics(s.graphics) },
-    accessibility: { ...d.accessibility, ...(s.accessibility || {}) },
-    camera: { ...d.camera, ...(s.camera || {}) },
-    input: { ...d.input, ...(s.input || {}) },
-    tutorial: { ...d.tutorial, ...(s.tutorial || {}) },
-    consent: { ...d.consent, ...(s.consent || {}) },
-  };
-}
-export function storeSettings(settings) {
-  return write(SETTINGS_KEY, settings);
-}
-
 /** Last safe local snapshot of an in-progress solo game (resume support). */
 const SNAPSHOT_KEY = 'royal-circuit:snapshot:v1';
 export function storeSnapshot(env) {
@@ -186,4 +152,18 @@ export function loadSnapshot() {
 }
 export function clearSnapshot() {
   try { localStorage.removeItem(SNAPSHOT_KEY); } catch { /* ignore */ }
+}
+
+/** The browser build's cloud document (JSON text of the wrapped save): its payload, or null. */
+export function readForeign(text) {
+  try {
+    const p = unwrap(JSON.parse(text));
+    return p && p.profile && p.stats ? p : null;
+  } catch { return null; }
+}
+
+/** The save as the engine client keeps it (missing groups filled in, junk dropped). */
+export function normalizeSave(raw) {
+  if (!raw || typeof raw !== 'object' || !raw.profile || !raw.stats) return defaultSave();
+  return mergeSaves(raw, defaultSave());
 }

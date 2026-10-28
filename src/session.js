@@ -38,7 +38,9 @@ export class Session {
     this.ranked = !!opts.ranked;
     this.undoAllowed = !!opts.undoAllowed;
     this.onEvent = opts.onEvent || (() => {});
-    this.startedAt = Date.now();
+    // Clock (ms): the device clock by default; the engine client passes its fixed-step clock.
+    this.now = opts.now || (() => Date.now());
+    this.startedAt = this.now();
     this.endedAt = null;
     this.history = []; // snapshot stack for undo
     this.pendingTimer = null;
@@ -108,7 +110,7 @@ export class Session {
       this.envelope.hashes.push({ tick: this.state.tick, hash: stateHash(this.state) });
     }
     if (this.isOver && !this.endedAt) {
-      this.endedAt = Date.now();
+      this.endedAt = this.now();
       this.envelope.result = this.results();
       clearSnapshot();
     } else {
@@ -134,6 +136,21 @@ export class Session {
     return true;
   }
 
+  /** One AI decision for the seat on move (roll, pass or its chosen float). False when a human is on move. */
+  aiStep() {
+    if (this.isOver || this.currentPlayer.kind !== 'ai') return false;
+    const acts = this.actions;
+    const seat = this.state.turnIndex;
+    if (acts.type === 'roll') this.command('roll');
+    else if (acts.type === 'pass') this.command('pass');
+    else if (acts.type === 'moves') {
+      const level = this.currentPlayer.level || 1;
+      const m = chooseMove(this.state, acts.moves, seat, level);
+      this.command('move', { floatId: m.floatId });
+    }
+    return true;
+  }
+
   /** Drive AI turns until a human (or game over) is on move. Async-paced. */
   async driveAI(paceMs = 650) {
     this.cancelled = false;
@@ -147,17 +164,7 @@ export class Session {
       // Pausing (or leaving) between the pace tick and the decision must stop
       // the AI here, not one move later.
       if (this.isOver || this.paused || this.cancelled) break;
-      const acts = this.actions;
-      const seat = this.state.turnIndex;
-      if (acts.type === 'roll') {
-        this.command('roll');
-      } else if (acts.type === 'pass') {
-        this.command('pass');
-      } else if (acts.type === 'moves') {
-        const level = this.currentPlayer.level || 1;
-        const m = chooseMove(this.state, acts.moves, seat, level);
-        this.command('move', { floatId: m.floatId });
-      }
+      this.aiStep();
     }
   }
 
@@ -176,7 +183,7 @@ export class Session {
   }
 
   elapsedMs() {
-    return (this.endedAt || Date.now()) - this.startedAt;
+    return (this.endedAt || this.now()) - this.startedAt;
   }
 
   /** Authoritative-style results with component breakdown + tie-breaks. */
@@ -244,8 +251,9 @@ export class Session {
   }
 
   /** Restore a persisted solo snapshot. */
-  static restore(doc, onEvent, { content = null, lesson = null } = {}) {
+  static restore(doc, onEvent, { content = null, lesson = null, now = null } = {}) {
     const s = new Session({
+      now: now || undefined,
       mode: doc.mode, ruleset: doc.state.ruleset, seed: doc.envelope.seed,
       players: doc.state.players.map((p) => ({ name: p.name, kind: p.kind })),
       ranked: doc.ranked, undoAllowed: doc.undoAllowed, onEvent,

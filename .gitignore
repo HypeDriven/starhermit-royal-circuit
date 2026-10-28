@@ -1,6 +1,5 @@
 node_modules/
-.local-data/
+.starhermit/
 *.log
 .DS_Store
 test-results/
-.tmp-build/
