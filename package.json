@@ -1,12 +1,18 @@
 {
   "name": "royal-circuit",
   "version": "1.0.0",
+  "description": "Royal Circuit — race four festival floats around a lantern-lit circuit. A dice race board game on the StarHermit engine.",
   "type": "module",
   "private": true,
   "scripts": {
+    "test": "npm run test:unit && npm run test:native",
+    "test:unit": "node tests/rules.test.mjs && node tests/content.test.mjs && node --test tests/save.test.mjs tests/i18n.test.mjs tests/progress.test.mjs",
+    "test:native": "node tests/native.mjs",
+    "test:browser": "node tools/browser-play.mjs .",
     "start": "node server.js",
-    "test": "node tests/rules.test.mjs && node tests/content.test.mjs && node --test tests/gfx.test.mjs tests/platform.test.mjs tests/i18n.test.mjs tests/save.test.mjs",
-    "test:e2e": "node tests/e2e.mjs"
+    "package": "node tools/package-web.mjs",
+    "css": "node tools/css.mjs",
+    "plays": "node tools/gen-plays.mjs"
   },
   "devDependencies": {
     "playwright-core": "^1.62.1"
