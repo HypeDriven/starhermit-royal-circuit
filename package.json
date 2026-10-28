@@ -6,7 +6,7 @@
   "private": true,
   "scripts": {
     "test": "npm run test:unit && npm run test:native",
-    "test:unit": "node tests/rules.test.mjs && node tests/content.test.mjs && node --test tests/save.test.mjs tests/i18n.test.mjs tests/progress.test.mjs",
+    "test:unit": "node tests/rules.test.mjs && node tests/content.test.mjs && node tests/session-regression.mjs && node --test tests/save.test.mjs tests/i18n.test.mjs tests/progress.test.mjs",
     "test:native": "node tests/native.mjs",
     "test:browser": "node tools/browser-play.mjs .",
     "start": "node server.js",

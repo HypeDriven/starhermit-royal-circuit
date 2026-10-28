@@ -1,5 +1,15 @@
 # Known Issues — Royal Circuit
 
+## Engine port (2026-10-28)
+
+The browser client (DOM + three.js r160) was replaced by a StarHermit engine 1.20.0 script game (`native/*.ts`); the
+rules, AI, content, session and save modules in `src/` are shared. The notes below about `src/ui.js`, `index.html`, the
+e2e test and the HTML panels describe the removed browser client (recoverable from commit eebaeb4). Current checks:
+`npm test` (unit suites + `tests/native.mjs` play scripts) and `npm run test:browser`. Known limitations of the port are
+listed in spec.md, "Port differences and known limitations". Fixed in the port: a lesson step could stall when an AI
+turn's events replaced the human's capture before its animation settled ("The Capture").
+
+
 QA pass 2026-08-20. Static review driven by Qwen3.8 27B on spark105 (OBLITERATED Q5_K_M),
 alongside the game's own test suite, a headless-Chrome crawl, and live WebSocket probes against a
 running `server.js`.

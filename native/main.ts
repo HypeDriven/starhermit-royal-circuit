@@ -58,7 +58,6 @@ export const app = {
   lessonStepIdx: 0,
   lessonFinishAt: 0,
   capturedThisGame: 0,
-  lastEvents: null as GameEvent[] | null,
   resultsView: null as ResultsView | null,
   lb: null as Lb | null,
   confirm: null as null | { text: string; yes: () => void; no: () => void },
@@ -411,7 +410,6 @@ function currentName(): string { return pname(app.session!.currentPlayer.name); 
 
 /** Central event fan-out (session → audio / render / HUD). */
 function onSessionEvent(events: GameEvent[], state: State): void {
-  app.lastEvents = events;
   const SFX: Record<string, string | null> = {
     roll: "roll", move: "move", deploy: "deploy", capture: "capture", crown: "crown", encore: "encore", overkindled: "overkindled",
     pass: "pass", turn: "turn", resign: "lose", gameover: null, undo: "undo",
@@ -433,7 +431,7 @@ async function animateAndSettle(events: GameEvent[], state: State, session: Sess
   animPending--;
   if (app.session !== session || !session) return;
   if (session.isOver && !app.replay) { showResults(); return; }
-  if (app.mode === "learn") checkLessonProgress();
+  if (app.mode === "learn") checkLessonProgress(events);
   updateFlow();
 }
 
@@ -517,7 +515,7 @@ export function doPass(): void {
 }
 export function canUndo(): boolean { const s = app.session; return !!s && s.undoAllowed && s.history.length > 0 && !app.replay; }
 export function doUndo(): void {
-  if (!canUndo() || app.inputLocked) return;
+  if (!canUndo()) return;
   if (app.session!.undo()) {
     render.skip();
     syncAll();
@@ -586,9 +584,10 @@ function showLessonStep(): void {
   app.coach = step.text;
   announce(T(step.text));
 }
-function checkLessonProgress(): void {
+/** ui.js checkLessonProgress, on the events of the batch that just settled (the browser build read the latest
+ * batch, which an AI turn queued during a long capture animation could replace, stalling the lesson). */
+function checkLessonProgress(evs: GameEvent[]): void {
   const step = app.lesson?.steps[app.lessonStepIdx];
-  const evs = app.lastEvents;
   if (!step || !evs) return;
   const match: Record<string, () => boolean> = {
     roll: () => evs.some((e) => e.t === "roll" && e.seat === 0),

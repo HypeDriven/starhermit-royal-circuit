@@ -393,7 +393,7 @@ function hud(L: Layout): void {
   const top = L.land ? 6 : m;
   // the top bar: mode + objective, the player chips, board state + pause
   const iconsW = 44 * 2 + 8;
-  const objW = L.phone ? Math.min(0.46 * L.lw, 200) : Math.min(340, lastW("hud-obj", 220));
+  const objW = L.phone ? Math.min(L.lw - 2 * m - iconsW - 12, 340) : Math.min(340, lastW("hud-obj", 220));
   ui.place("hud-left", { anchor: "top-start", x: m, y: top }, () => {
     lastSize.set("hud-obj", ui.column("hud-obj", () => {
       const iw = (L.phone ? objW : 340) - 28;
@@ -409,17 +409,43 @@ function hud(L: Layout): void {
     }, { spacing: 8 });
   });
   const objActual = Math.min(objW, lastW("hud-obj", objW));
-  const chipsW = Math.max(100, L.lw - 2 * m - objActual - iconsW - 24);
-  ui.place("hud-chips", { anchor: "top-start", x: m + objActual + 12, y: top }, () => {
+  // the chips sit between the objective box and the buttons; when that leaves too little room (phones), in a
+  // row under the top bar beside the drawer toggles
+  const between = L.lw - 2 * m - objActual - iconsW - 24;
+  const under = between < 220;
+  const chipsW = under ? L.lw - 2 * m - (L.wide ? 0 : 96 + 12) : between;
+  const chipsY = under ? top + 54 : top;
+  ui.place("hud-chips", { anchor: "top-start", x: under ? m : m + objActual + 12, y: chipsY }, () => {
     playerChips(chipsW, L);
   });
+  // the banner, the lesson coach, the caption
+  if (app.banner) {
+    const bw = Math.min(0.92 * L.lw, 560);
+    const y = Math.max(L.land ? 56 : 76, chipsY + lastH("hud-chips-col", 40) + 12, L.wide || L.land ? 0 : 70 + 2 * 40 + 6 + 12);
+    ui.place("turn-banner", { anchor: "top", y }, () => {
+      ui.column("banner", () => para(app.banner!.text, bw - 44, "banner-text", "turn-banner-text"), { style: "banner" });
+    });
+  }
+  if (app.mode === "learn" && app.coach) {
+    const cw = Math.min(0.92 * L.lw, 520);
+    // on compact windows the coach sits under the drawer toggles
+    const below = Math.max((L.land ? 56 : 70) + 2 * 40 + 6, chipsY + lastH("hud-chips-col", 40)) + 60;
+    ui.place("lesson-coach", { anchor: "top", y: L.wide ? 120 : L.land ? 96 : Math.max(120, below) }, () => {
+      ui.column("coach", () => para(T(app.coach), cw - 40, "coach-text", "lesson-coach"), { style: "coach" });
+    });
+  }
+  if (app.caption) {
+    ui.place("caption-line", { anchor: "bottom", y: L.land ? 70 : 96 }, () => {
+      ui.column("caption", () => ui.style("caption-text").label(app.caption!.text), { style: "caption" });
+    });
+  }
   // rails
   if (L.wide) {
     railBox("rail-left", "start", 218, L, () => leftRail(186));
     railBox("rail-right", "end", 218, L, () => rightRail(186));
   } else {
     const ty = L.land ? 56 : 70;
-    ui.place("rail-toggles", { anchor: "top-end", x: m, y: ty + (L.phone ? lastH("hud-chips-col", 40) - 40 : 0) }, () => {
+    ui.place("rail-toggles", { anchor: "top-end", x: m, y: ty }, () => {
       ui.column("rail-toggle-col", () => {
         button({ id: "toggle-left", text: T("Objective"), style: "btn-rail", width: 96, selected: app.railOpen === "left",
           act: () => { app.railOpen = app.railOpen === "left" ? null : "left"; } });
@@ -443,25 +469,6 @@ function hud(L: Layout): void {
         }, { style: "rail", width: dw, padding: 14 });
       });
     }
-  }
-  // the banner, the lesson coach, the caption
-  if (app.banner) {
-    const bw = Math.min(0.92 * L.lw, 560);
-    const y = L.land ? 56 : L.phone ? 164 : 76;
-    ui.place("turn-banner", { anchor: "top", y }, () => {
-      ui.column("banner", () => para(app.banner!.text, bw - 44, "banner-text", "turn-banner-text"), { style: "banner" });
-    });
-  }
-  if (app.mode === "learn" && app.coach) {
-    const cw = Math.min(0.92 * L.lw, 520);
-    ui.place("lesson-coach", { anchor: "top", y: L.land ? 96 : L.phone ? 210 : 120 }, () => {
-      ui.column("coach", () => para(T(app.coach), cw - 40, "coach-text", "lesson-coach"), { style: "coach" });
-    });
-  }
-  if (app.caption) {
-    ui.place("caption-line", { anchor: "bottom", y: L.land ? 70 : 96 }, () => {
-      ui.column("caption", () => ui.style("caption-text").label(app.caption!.text), { style: "caption" });
-    });
   }
   // the float picker and the tray
   picker(L);
@@ -594,7 +601,9 @@ function picker(L: Layout): void {
     for (const p of placed) ui.place(`pick-at-${p.it.mv.floatId}`, { anchor: "top-start", x: p.x, y: p.y }, () => pickBtn(p.it));
   } else {
     const w = Math.min(0.92 * L.lw, 900);
-    const bottom = (L.land ? 64 : 92) + (L.phone ? 18 : 0);
+    let bottom = (L.land ? 64 : 92) + (L.phone ? 18 : 0);
+    // an open rail drawer sits over the tray: the docked picker goes above it
+    if (!L.wide && app.railOpen) bottom = (L.land ? 64 : 86) + Math.min(lastH("drawer-in", 100) + 28, (L.land ? 0.56 : 0.44) * L.lh) + 8;
     const anchor = platform.options.leftHanded && !L.phone ? "bottom-end" : "bottom";
     ui.place("float-picker", { anchor, x: anchor === "bottom-end" ? 14 : 0, y: bottom }, () => {
       flow("float-picker-row", items.map((it) => ({ id: `pick-${it.mv.floatId}`, text: it.text, style: "btn-pick", selected: it.i === app.pickIdx, act: () => doMove(it.mv.floatId) })), w, 8, "center");

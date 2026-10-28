@@ -1,11 +1,10 @@
 // Every player-facing string exists in all nine locales (node --test).
-// Keys are the US-English source strings: literal T('…') / N('…') calls in
-// src/, data-i18n markup in index.html, and the display fields of the content
-// tables (stages, lessons, challenges, achievements, AI names, …).
+// Keys are the US-English source strings: literal T("…") / N("…") calls in
+// native/*.ts and src/, the sound captions, and the display fields of the
+// content tables (stages, lessons, challenges, achievements, AI names, …).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DICTS, LOCALES, T, pname, setLocale, getLang } from '../src/i18n.js';
-import { gfxStrings } from '../src/gfxstrings.js';
 import { shText } from '../src/shstrings.js';
 import { ALL } from './i18n-keys.mjs';
 
@@ -48,9 +47,8 @@ test('T falls back to the key, fills placeholders; built-in names translate, pla
   assert.equal(T('Roll'), 'Roll');
 });
 
-test('graphics and StarHermit chrome strings follow the game language', () => {
+test('StarHermit chrome strings follow the game language', () => {
   setLocale('it-IT');
-  assert.equal(gfxStrings().quality, gfxStrings('it-IT').quality);
   assert.equal(shText('invite'), shText('invite'));
   assert.notEqual(shText('signIn'), 'Sign in with StarHermit');
   setLocale('en-US');
