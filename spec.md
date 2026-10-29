@@ -5,7 +5,7 @@
 **Genre:** Turn-based race board  
 **Players:** 2–4 players depending on ruleset, plus practice AI  
 **Targets:** the StarHermit client (native) and browsers through the engine's web runtime; desktop, phones and tablets, landscape and portrait  
-**Implementation:** a StarHermit engine script game (engine 1.24.0, `engine.minor=20`): `native/*.ts` over the pure rules, AI, content, session and save modules in `src/`; the pavilion on `starhermit:scene`, every screen on `starhermit:ui`
+**Implementation:** a StarHermit engine script game (engine 1.27.0, `engine.minor=29`): `native/*.ts` over the pure rules, AI, content, session and save modules in `src/`; the pavilion on `starhermit:scene`, every screen on `starhermit:ui`
 
 ## 1. Product vision
 
@@ -156,7 +156,7 @@ Follow the skill pack's acceptance gate: deterministic seeds, debug views for co
 
 ### Graphics
 
-The pavilion (`native/render.ts`) is the browser build's three.js r160 scene on `starhermit:scene`: one warm key light with soft shadows (the engine's view-fitted directional shadow), a hemisphere fill and the flickering pavilion point light (r160 intensities ÷ π, the engine's legacy light units), ACES filmic tone mapping at exposure 1.12; the circuit's lacquered tiles framed by gold rims, gold inlay rings under the safe tiles' lanterns, the dais, pillars and roof, twelve perimeter lanterns with festoon bulbs on wires, per-seat workshop pads, start rings and coloured approach steps, the floats (gold base, the seat's shape, a lamp top, a selection ring), the pip-faced die, pulsing hint rings, burst particles and drifting embers under the starry WGSL sky dome; the theme recolours board, lanterns, sky and fog. Reflections are `new RoomEnvironment(renderer)` (as the r160 page called it) as each lit material's own environment map at its old intensity.
+The pavilion (`native/render.ts`) is the browser build's three.js r160 scene on `starhermit:scene`: one warm key light with soft shadows (render.js's fitted orthographic shadow box, bias and normalBias), a hemisphere fill and the flickering pavilion point light (r160 intensities as written), ACES filmic tone mapping at exposure 1.12; the circuit's lacquered tiles framed by gold rims, gold inlay rings under the safe tiles' lanterns, the dais, pillars and roof, twelve perimeter lanterns with festoon bulbs on wires, per-seat workshop pads, start rings and coloured approach steps, the floats (gold base, the seat's shape, a lamp top, a selection ring), the pip-faced die, pulsing hint rings, burst particles and drifting embers under the starry WGSL sky dome; the theme recolours board, lanterns, sky and fog. Reflections are `new RoomEnvironment(renderer)` (as the r160 page called it) as each lit material's own environment map at its old intensity.
 
 **Quality.** The runtime's Options choose the graphics level (Auto from the device, render scale, frame-rate limit, adaptive resolution, the FPS readout); `native/quality.ts` maps its tier to the browser build's preset table and budgets:
 
@@ -208,7 +208,7 @@ No module mutates rules state except through a validated command. Rendering reco
 ## 6. StarHermit integration
 
 ### Packaging and launch
-- `starhermit.txt`: name, description, owner, `server=score-script.js`, cover, `launch=index.html`, `engine.api=1`, `engine.entry=native/main.ts`, `engine.version=1.24.0`, `engine.minor=20`, `engine.capabilities=platform,storage,clipboard`, the `control.*` keys and `engine.gamepad.*` buttons with their groups.
+- `starhermit.txt`: name, description, owner, `server=score-script.js`, cover, `launch=index.html`, `engine.api=1`, `engine.entry=native/main.ts`, `engine.version=1.27.0`, `engine.minor=29`, `engine.capabilities=platform,storage,clipboard`, the `control.*` keys and `engine.gamepad.*` buttons with their groups.
 - `npm run package` (`starhermit package --web .`) writes the web loader `index.html` and `starhermit-files.json`; `.starhermitignore` leaves out tests, tools, docs, the dev server and documents.
 
 ### Identity, saves and settings

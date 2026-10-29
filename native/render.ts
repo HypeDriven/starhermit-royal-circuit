@@ -13,11 +13,10 @@
 // on the exact end state; skip() settles at once.
 //
 // Port notes:
-// - three.js r160 (physically based lights): colours as written; the
-//   hemisphere, key and pavilion point light intensities ÷ π (the engine
-//   takes three's legacy units; point falloff already follows r155+).
+// - three.js r160 (physically based lights): colours and intensities as
+//   written (engine.minor 29 follows three r155+ light units).
 // - render.js passed the renderer to RoomEnvironment (r160 → the
-//   900-candela room) and set scene.environment; at engine.minor 20 the
+//   900-candela room) and set scene.environment; in the engine the
 //   scene environment ignores per-material envMapIntensity, so every lit
 //   material carries the environment as its own envMap at its old intensity.
 // - The old composer (RenderPass in half floats → GTAO → UnrealBloom 0.42 /
@@ -26,9 +25,8 @@
 //   grade / antialias; Low draws straight to the canvas with MSAA.
 // - The sky dome's GLSL is WGSL; the procedural canvases are OffscreenCanvas
 //   (starhermit:canvas) with the same drawing.
-// - The key light's fitted orthographic shadow box is the engine's
-//   view-based directional shadow (shadow.distance); three's normalBias 0.02
-//   world units is about 1 texel here.
+// - The key light keeps render.js's fitted orthographic shadow box, bias and
+//   normalBias; bloom strength is squared for r185's UnrealBloomPass.
 // - Tweens advance on the runtime's fixed steps (step()), so the event
 //   playback, and with it every AI turn's pacing, is the same on every
 //   machine and in play scripts.
@@ -38,7 +36,7 @@ import {
   LineSegments, Matrix4, Mesh, MeshBasicMaterial, MeshLambertMaterial, MeshPhysicalMaterial, MeshStandardMaterial, PerspectiveCamera,
   PMREMGenerator, PointLight, Points, PointsMaterial, Quaternion, Raycaster, RepeatWrapping, RingGeometry, RoomEnvironment, SRGBColorSpace,
   ShaderMaterial, SphereGeometry, TorusGeometry, Vector2, Vector3, pointerToNdc, renderer, scene,
-  type Material, type Object3D, type Texture,
+  type Material, type Object3D, type OrthographicCamera, type Texture,
 } from "starhermit:scene";
 import { OffscreenCanvas, type OffscreenCanvasRenderingContext2D } from "starhermit:canvas";
 import { Layout, Rules, type GameEvent, type Move, type State, type Theme } from "./game.ts";
@@ -215,14 +213,20 @@ const ndc = new Vector2();
 const easeOut = (t: number): number => 1 - Math.pow(1 - t, 3);
 const easeInOut = (t: number): number => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
-// one dominant key (shadow caster), soft hemisphere fill, warm pavilion point (r160 intensities ÷ π)
-const hemi = new HemisphereLight(0x8880b0, 0x1a1426, 0.55 / PI);
-const key = new DirectionalLight(0xfff1d6, 1.35 / PI);
+// one dominant key (shadow caster), soft hemisphere fill, warm pavilion point (r160 intensities)
+const hemi = new HemisphereLight(0x8880b0, 0x1a1426, 0.55);
+const key = new DirectionalLight(0xfff1d6, 1.35);
 key.position.set(14, 24, 10);
+// shadow frustum fitted to the board + perimeter lanterns (radius ~19), as render.js
+{
+  const SHADOW_R = WORKSHOP_RADIUS + 5.4;
+  const cam = key.shadow.camera as OrthographicCamera;
+  cam.left = -SHADOW_R; cam.right = SHADOW_R; cam.top = SHADOW_R; cam.bottom = -SHADOW_R; cam.near = 8; cam.far = 62;
+  cam.updateProjectionMatrix();
+}
 key.shadow.bias = -0.0004;
-key.shadow.normalBias = 1;
-key.shadow.distance = 80;
-const pavilionLight = new PointLight(0xffb347, 30 / PI, 26, 1.8);
+key.shadow.normalBias = 0.02;
+const pavilionLight = new PointLight(0xffb347, 30, 26, 1.8);
 pavilionLight.position.set(0, 4.2, 0);
 scene.add(hemi, key, key.target);
 
@@ -906,7 +910,8 @@ export function applyLook(next: Look): void {
   key.castShadow = next.shadows > 0;
   if (next.shadows > 0) key.shadow.mapSize = next.shadows;
   // UnrealBloomPass(0.42, 0.4, 0.92): only lanterns, festoon bulbs and bright highlights bloom.
-  renderer.bloom = next.bloom ? { strength: 0.42, radius: 0.4, threshold: 0.92, resolution: next.budget.bloomRes } : null;
+  // r160 page: strength 0.42 → 0.42² at minor 29 (r185 bloom).
+  renderer.bloom = next.bloom ? { strength: 0.42 * 0.42, radius: 0.4, threshold: 0.92, resolution: next.budget.bloomRes } : null;
   // GTAOPass: radius 0.9, distance exponent 1.5, thickness 1.5, 16 / 8 samples and the denoise per tier; blend 0.75.
   renderer.ao = next.ao === "off" ? null : {
     blendIntensity: 0.75, radius: 0.9, distanceExponent: 1.5, thickness: 1.5, scale: 1,
@@ -915,7 +920,8 @@ export function applyLook(next: Look): void {
   };
   // GradeShader after OutputPass (display space): a 0.22 smoothstep S-curve (slope 1.11 at mid grey),
   // saturation 1.1, cool shadows / warm highlights by a smoothstep of luma from 0.25 to 0.85, a 0.26
-  // vignette from 0.38 to 0.9 (x stretched 1.1).
+  // vignette from 0.38 to 0.9 (x stretched 1.1). Its s * 0.98 + 0.015 lift has no display-space
+  // equivalent (levels are linear only): about +4 levels on darks are left out.
   renderer.grade = next.grade ? {
     space: "display", contrast: 0.11, saturation: 1.1, split: [0.25, 0.85], shadows: [0.97, 0.98, 1.04], highlights: [1.04, 1.0, 0.95],
     vignette: { amount: 0.26, inner: 0.38, outer: 0.9, scale: [1.1, 1] },
@@ -1089,12 +1095,12 @@ export function update(dt: number, w: number, h: number): void {
   hintRings.forEach((ring, i) => { if (ring.visible && !reducedMotion) ring.scale.setScalar(1 + Math.sin((time * 1000) / 260 + i) * 0.08); });
   const lantern = M.lantern as MeshStandardMaterial | undefined;
   if (animated) {
-    pavilionLight.intensity = (30 + Math.sin(ambientTime * 1.1) * 3 + Math.sin(ambientTime * 3.7) * 1.2) / PI;
+    pavilionLight.intensity = (30 + Math.sin(ambientTime * 1.1) * 3 + Math.sin(ambientTime * 3.7) * 1.2);
     if (lantern) lantern.emissiveIntensity = 1.6 + Math.sin(ambientTime * 2.3) * 0.12 + Math.sin(ambientTime * 5.1) * 0.06;
     for (const lamp of lanternLamps) lamp.position.y = (lamp.userData.baseY as number) + Math.sin(ambientTime * 1.4 + (lamp.userData.phase as number)) * 0.04;
     skyUniforms.uTime.value = ambientTime;
   } else {
-    pavilionLight.intensity = 30 / PI;
+    pavilionLight.intensity = 30;
     if (lantern) lantern.emissiveIntensity = 1.6;
   }
 }
