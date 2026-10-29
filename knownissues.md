@@ -2,7 +2,7 @@
 
 ## Engine port (2026-10-28)
 
-The browser client (DOM + three.js r160) was replaced by a StarHermit engine 1.22.0 script game (`native/*.ts`); the
+The browser client (DOM + three.js r160) was replaced by a StarHermit engine 1.23.0 script game (`native/*.ts`); the
 rules, AI, content, session and save modules in `src/` are shared. The notes below about `src/ui.js`, `index.html`, the
 e2e test and the HTML panels describe the removed browser client (recoverable from commit eebaeb4). Current checks:
 `npm test` (unit suites + `tests/native.mjs` play scripts) and `npm run test:browser`. Known limitations of the port are
