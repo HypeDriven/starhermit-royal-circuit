@@ -5,7 +5,7 @@
 **Genre:** Turn-based race board  
 **Players:** 2–4 players depending on ruleset, plus practice AI  
 **Targets:** the StarHermit client (native) and browsers through the engine's web runtime; desktop, phones and tablets, landscape and portrait  
-**Implementation:** a StarHermit engine script game (engine 1.23.0, `engine.minor=20`): `native/*.ts` over the pure rules, AI, content, session and save modules in `src/`; the pavilion on `starhermit:scene`, every screen on `starhermit:ui`
+**Implementation:** a StarHermit engine script game (engine 1.24.0, `engine.minor=20`): `native/*.ts` over the pure rules, AI, content, session and save modules in `src/`; the pavilion on `starhermit:scene`, every screen on `starhermit:ui`
 
 ## 1. Product vision
 
@@ -208,7 +208,7 @@ No module mutates rules state except through a validated command. Rendering reco
 ## 6. StarHermit integration
 
 ### Packaging and launch
-- `starhermit.txt`: name, description, owner, `server=score-script.js`, cover, `launch=index.html`, `engine.api=1`, `engine.entry=native/main.ts`, `engine.version=1.23.0`, `engine.minor=20`, `engine.capabilities=platform,storage,clipboard`, the `control.*` keys and `engine.gamepad.*` buttons with their groups.
+- `starhermit.txt`: name, description, owner, `server=score-script.js`, cover, `launch=index.html`, `engine.api=1`, `engine.entry=native/main.ts`, `engine.version=1.24.0`, `engine.minor=20`, `engine.capabilities=platform,storage,clipboard`, the `control.*` keys and `engine.gamepad.*` buttons with their groups.
 - `npm run package` (`starhermit package --web .`) writes the web loader `index.html` and `starhermit-files.json`; `.starhermitignore` leaves out tests, tools, docs, the dev server and documents.
 
 ### Identity, saves and settings
