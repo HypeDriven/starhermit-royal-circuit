@@ -303,7 +303,7 @@ function environmentTexture(): Texture | null {
   if (!envTex) {
     try {
       const pm = new PMREMGenerator(renderer);
-      envTex = pm.fromScene(new RoomEnvironment(renderer), 0.04).texture;
+      const pageRoom = new RoomEnvironment(renderer); pageRoom.position.y = 0; /* the page's three r160 (pre-r183) builds the room at the origin */ envTex = pm.fromScene(pageRoom, 0.04).texture;
       pm.dispose();
     } catch (e) { console.warn(`environment: ${String(e)}`); }
   }
