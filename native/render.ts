@@ -910,20 +910,20 @@ export function applyLook(next: Look): void {
   key.castShadow = next.shadows > 0;
   if (next.shadows > 0) key.shadow.mapSize = next.shadows;
   // UnrealBloomPass(0.42, 0.4, 0.92): only lanterns, festoon bulbs and bright highlights bloom.
-  // r160 page: strength 0.42 → 0.42² at minor 29 (r185 bloom).
-  renderer.bloom = next.bloom ? { strength: 0.42 * 0.42, radius: 0.4, threshold: 0.92, resolution: next.budget.bloomRes } : null;
+  // r160 page: its UnrealBloomPass exactly (model "r160", strength as written).
+  renderer.bloom = next.bloom ? { model: "r160", strength: 0.42, radius: 0.4, threshold: 0.92, resolution: next.budget.bloomRes } : null;
   // GTAOPass: radius 0.9, distance exponent 1.5, thickness 1.5, 16 / 8 samples and the denoise per tier; blend 0.75.
   renderer.ao = next.ao === "off" ? null : {
     blendIntensity: 0.75, radius: 0.9, distanceExponent: 1.5, thickness: 1.5, scale: 1,
     samples: next.ao === "high" ? 16 : 8, resolution: next.budget.aoRes,
     denoise: { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: next.ao === "high" ? 6 : 4, rings: 2, samples: next.ao === "high" ? 16 : 8, radiusExponent: 2 },
   };
-  // GradeShader after OutputPass (display space): a 0.22 smoothstep S-curve (slope 1.11 at mid grey),
+  // GradeShader after OutputPass (display space): a 0.22 smoothstep S-curve (contrastCurve "s"),
   // saturation 1.1, cool shadows / warm highlights by a smoothstep of luma from 0.25 to 0.85, a 0.26
-  // vignette from 0.38 to 0.9 (x stretched 1.1). Its s * 0.98 + 0.015 lift has no display-space
-  // equivalent (levels are linear only): about +4 levels on darks are left out.
+  // vignette from 0.38 to 0.9 (x stretched 1.1) and the s * 0.98 + 0.015 lift (levels).
   renderer.grade = next.grade ? {
-    space: "display", contrast: 0.11, saturation: 1.1, split: [0.25, 0.85], shadows: [0.97, 0.98, 1.04], highlights: [1.04, 1.0, 0.95],
+    space: "display", contrastCurve: "s", contrast: 0.22, saturation: 1.1, split: [0.25, 0.85], shadows: [0.97, 0.98, 1.04], highlights: [1.04, 1.0, 0.95],
+    levels: [0.98, 0.015],
     vignette: { amount: 0.26, inner: 0.38, outer: 0.9, scale: [1.1, 1] },
   } : null;
   renderer.antialias = next.antialias;
