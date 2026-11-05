@@ -18,7 +18,7 @@
 // timing assistance), the event playback's tweens, the banners, captions and
 // toasts and the replay run on a clock advanced 1/60 s per fixed step, so
 // slow frames never change a match and play scripts replay exactly.
-import { clipboard, frame, onFixedUpdate, onPreferencesChange, onRender, onResume, onStart, onSuspend, onUpdate, preferences, setFixedRate } from "starhermit:engine";
+import { clipboard, frame, levelSettings, onFixedUpdate, onPreferencesChange, onRender, onResume, onStart, onSuspend, onUpdate, preferences, setFixedRate } from "starhermit:engine";
 import { onAction, onPointerButton, onPointerMove, onTouch, primaryPointer, vibrate } from "starhermit:input";
 import * as ui from "starhermit:ui";
 import { onSessionEnded, requestSignIn } from "starhermit:platform";
@@ -97,6 +97,8 @@ function flushAnnouncements(): void {
   spokenAssertive = false;
 }
 export function toast(text: string, kind: "info" | "error" = "info", ms = 3400): void {
+  // off the table the engine's toasts do; the table's stack sits below its HUD
+  if (app.screen !== "game") { ui.toast!(text, { duration: ms / 1000, position: "top", style: [kind === "error" ? "toast-error" : "toast", "toast-text"], dismissible: false }); return; }
   app.toasts.push({ text, kind, until: clockMs + ms });
   if (app.toasts.length > 4) app.toasts.shift();
 }
@@ -274,7 +276,7 @@ export function signIn(): void { void requestSignIn().catch(() => undefined); }
 export function invite(): void {
   const link = platform.inviteLink();
   if (!link) return;
-  try { clipboard.writeText(link); toast(S("inviteCopied")); } catch { toast(S("inviteLink", { url: link }), "info", 8000); }
+  try { clipboard.writeText(link); toast(S("inviteCopied")); } catch { toast(S("inviteLink", { link: link }), "info", 8000); }
 }
 
 // ------------------------------------------------------------------ progression + achievements (idempotent unlocks)
@@ -910,10 +912,10 @@ onFixedUpdate(() => {
 let lookKey = "";
 function applyLook(): void {
   const f = frame();
-  const k = `${f.quality}:${f.levelIndex}`;
+  const k = f.level;
   if (k === lookKey) return;
   lookKey = k;
-  render.applyLook(lookFor(f.quality, f.levelIndex));
+  render.applyLook(lookFor(levelSettings(f.level)));
 }
 function applyOptions(): void {
   render.setPalette(platform.options.palette);

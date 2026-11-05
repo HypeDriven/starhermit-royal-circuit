@@ -34,13 +34,13 @@ import {
   ACESFilmicToneMapping, AdditiveBlending, BackSide, BoxGeometry, BufferAttribute, BufferGeometry, CanvasTexture, CircleGeometry, Color,
   ConeGeometry, CylinderGeometry, DirectionalLight, DoubleSide, Euler, Fog, Group, HemisphereLight, InstancedMesh, LineBasicMaterial,
   LineSegments, Matrix4, Mesh, MeshBasicMaterial, MeshLambertMaterial, MeshPhysicalMaterial, MeshStandardMaterial, PerspectiveCamera,
-  PMREMGenerator, PointLight, Points, PointsMaterial, Quaternion, Raycaster, RepeatWrapping, RingGeometry, RoomEnvironment, SRGBColorSpace,
+  PMREMGenerator, PointLight, ParticleEmitter, Points, PointsMaterial, Quaternion, Raycaster, RepeatWrapping, RingGeometry, RoomEnvironment, SRGBColorSpace,
   ShaderMaterial, SphereGeometry, TorusGeometry, Vector2, Vector3, pointerToNdc, renderer, scene,
   type Material, type Object3D, type OrthographicCamera, type Texture,
 } from "starhermit:scene";
 import { OffscreenCanvas, type OffscreenCanvasRenderingContext2D } from "starhermit:canvas";
 import { Layout, Rules, type GameEvent, type Move, type State, type Theme } from "./game.ts";
-import { MOTE_MAX, PARTICLE_MAX, moteCount, particleCap, type Look } from "./quality.ts";
+import { MOTE_MAX, moteCount, particleCap, type Look } from "./quality.ts";
 
 const { RING_RADIUS, TILE_SIZE, WORKSHOP_RADIUS } = Layout;
 const { TRACK_LEN, DONE, SAFE_CELLS, PLAYER_DEFS } = Rules;
@@ -271,12 +271,10 @@ let playerBoard: Group | null = null;
 let floatsRoot: Group | null = null;
 let die: Mesh | null = null;
 let hintRings: Mesh[] = [];
-let particles: Points | null = null, pGeo: BufferGeometry | null = null;
+/** Burst emitters by colour (an emitter's colour is read for its live particles too), made as bursts ask; rebuilt with the board. */
+const bursts = new Map<number, ParticleEmitter>();
+let burstMat: PointsMaterial | null = null, burstLayer: Group | null = null, burstCap = 0;
 let motes: Points | null = null, mGeo: BufferGeometry | null = null;
-const pPos = new Float32Array(PARTICLE_MAX * 3);
-const pCol = new Float32Array(PARTICLE_MAX * 3);
-let pLive: { i: number; vx: number; vy: number; vz: number; life: number }[] = [];
-let pFree: number[] = [];
 const mPos = new Float32Array(MOTE_MAX * 3);
 const mSeed: { a: number; r: number; y: number; sp: number; ph: number }[] = [];
 {
@@ -576,19 +574,11 @@ function build(): void {
     hintRings.push(ring);
   }
 
-  // particle pool (never raycast)
-  pGeo = track(new BufferGeometry());
-  pGeo.setAttribute("position", new BufferAttribute(pPos, 3));
-  pGeo.setAttribute("color", new BufferAttribute(pCol, 3));
-  pLive = [];
-  pFree = [];
-  for (let i = PARTICLE_MAX - 1; i >= 0; i--) { pFree.push(i); pPos[i * 3 + 1] = -999; }
-  particles = new Points(pGeo, track(new PointsMaterial({
-    size: 0.26, vertexColors: true, transparent: true, opacity: 0.95, depthWrite: false, map: tex.sprite, alphaTest: 0.02,
-  })));
-  particles.frustumCulled = false;
-  particles.noAO = true;
-  fxLayer.add(particles);
+  // burst pool (never raycast)
+  bursts.clear();
+  burstLayer = fxLayer;
+  burstCap = particleCap(look);
+  burstMat = track(new PointsMaterial({ size: 0.26, transparent: true, opacity: 0.95, depthWrite: false, map: tex.sprite, alphaTest: 0.02 }));
 
   // ambient lantern embers drifting up around the circuit (additive)
   for (let i = 0; i < MOTE_MAX; i++) {
@@ -693,38 +683,18 @@ function computePlacements(state: State): { seat: number; fid: number; p: number
 
 // ---------------------------------------------------------------- particles
 function burst(pos: Pos, colorHex: number, n = 18, speed = 3.2): void {
-  if (reducedMotion || !look || !pGeo) return;
-  const col = new Color(colorHex);
+  if (reducedMotion || !look || !burstMat || !burstLayer) return;
   const cap = particleCap(look);
-  for (let k = 0; k < n && pFree.length; k++) {
-    const i = pFree.pop()!;
-    if (i >= cap) continue;
-    const a = Math.random() * PI * 2;
-    const up = Math.random() * 0.9 + 0.35;
-    pLive.push({ i, vx: Math.cos(a) * speed * Math.random(), vy: up * speed, vz: Math.sin(a) * speed * Math.random(), life: 0.9 + Math.random() * 0.5 });
-    pPos[i * 3] = pos.x; pPos[i * 3 + 1] = pos.y + 0.3; pPos[i * 3 + 2] = pos.z;
-    pCol[i * 3] = col.r; pCol[i * 3 + 1] = col.g; pCol[i * 3 + 2] = col.b;
+  if (cap !== burstCap) { burstCap = cap; for (const e of bursts.values()) { burstLayer.remove(e); e.dispose(); } bursts.clear(); }
+  let e = bursts.get(colorHex);
+  if (!e) {
+    e = track(new ParticleEmitter({ capacity: Math.max(1, cap), material: burstMat, seed: colorHex + 1, space: "local", color: colorHex, life: [0.9, 1.4], gravity: [0, -7, 0] }));
+    e.frustumCulled = false;
+    e.noAO = true;
+    burstLayer.add(e);
+    bursts.set(colorHex, e);
   }
-  pGeo.getAttribute("position")!.needsUpdate = true;
-  pGeo.getAttribute("color")!.needsUpdate = true;
-}
-function updateParticles(dt: number): void {
-  if (!pLive.length || !pGeo) return;
-  for (let k = pLive.length - 1; k >= 0; k--) {
-    const p = pLive[k]!;
-    p.life -= dt;
-    if (p.life <= 0) {
-      pPos[p.i * 3 + 1] = -999;
-      pFree.push(p.i);
-      pLive.splice(k, 1);
-      continue;
-    }
-    p.vy -= 7 * dt;
-    pPos[p.i * 3] += p.vx * dt;
-    pPos[p.i * 3 + 1] = Math.max(0.05, pPos[p.i * 3 + 1]! + p.vy * dt);
-    pPos[p.i * 3 + 2] += p.vz * dt;
-  }
-  pGeo.getAttribute("position")!.needsUpdate = true;
+  e.set({ velocity: [0, 0.8 * speed, 0], velocitySpread: [0.7 * speed, 0.45 * speed, 0.7 * speed] }).burst(n, [pos.x, pos.y + 0.3, pos.z]);
 }
 function updateMotes(dt: number): void {
   if (!motes || !mGeo || !motes.visible || reducedMotion) return;
@@ -758,7 +728,6 @@ export function step(dt: number): void {
       tw.resolve();
     }
   }
-  updateParticles(dt);
 }
 /** Settle every running tween instantly into its end state. */
 export function skip(): void {
@@ -911,12 +880,12 @@ export function applyLook(next: Look): void {
   if (next.shadows > 0) key.shadow.mapSize = next.shadows;
   // UnrealBloomPass(0.42, 0.4, 0.92): only lanterns, festoon bulbs and bright highlights bloom.
   // r160 page: its UnrealBloomPass exactly (model "r160", strength as written).
-  renderer.bloom = next.bloom ? { model: "r160", strength: 0.42, radius: 0.4, threshold: 0.92, resolution: next.budget.bloomRes } : null;
+  renderer.bloom = next.bloom !== null ? { model: "r160", strength: 0.42, radius: 0.4, threshold: 0.92, resolution: next.bloom } : null;
   // GTAOPass: radius 0.9, distance exponent 1.5, thickness 1.5, 16 / 8 samples and the denoise per tier; blend 0.75.
-  renderer.ao = next.ao === "off" ? null : {
+  renderer.ao = !next.ao ? null : {
     blendIntensity: 0.75, radius: 0.9, distanceExponent: 1.5, thickness: 1.5, scale: 1,
-    samples: next.ao === "high" ? 16 : 8, resolution: next.budget.aoRes,
-    denoise: { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: next.ao === "high" ? 6 : 4, rings: 2, samples: next.ao === "high" ? 16 : 8, radiusExponent: 2 },
+    samples: next.ao.samples, resolution: next.ao.resolution,
+    denoise: { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: next.ao.resolution >= 1 ? 6 : 4, rings: 2, samples: next.ao.denoiseSamples, radiusExponent: 2 },
   };
   // GradeShader after OutputPass (display space): a 0.22 smoothstep S-curve (contrastCurve "s"),
   // saturation 1.1, cool shadows / warm highlights by a smoothstep of luma from 0.25 to 0.85, a 0.26

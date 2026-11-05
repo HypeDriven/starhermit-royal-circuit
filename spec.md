@@ -106,7 +106,7 @@ The old media queries are layouts `native/screens.ts` picks from the window's lo
 
 ### Localization
 
-Every player-facing string ships in en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR and it-IT (`src/i18n.js` + `src/locales/*`, English source text as keys; the StarHermit chrome strings in `src/shstrings.js`). The language is the runtime's interface language (Options › Language, else the account's preferred language, else the device's), mapped to the nearest shipped locale (es-MX → es-419, en-AU → en-GB, pt-PT → pt-BR, fr-BE → fr-FR); every string is drawn through `T()` each frame, so a change shows on the next frame without restarting the match. Built-in names (AI rivals, seats, Guest Envoy) translate; players' own names do not.
+Every player-facing string ships in en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR and it-IT (`assets/strings.json` through the engine's `strings`, English source text as keys; the StarHermit chrome strings in `src/shstrings.js`). The language is the runtime's interface language (Options › Language, else the account's preferred language, else the device's), mapped to the nearest shipped locale (es-MX → es-419, en-AU → en-GB, pt-PT → pt-BR, fr-BE → fr-FR); every string is drawn through `T()` each frame, so a change shows on the next frame without restarting the match. Built-in names (AI rivals, seats, Guest Envoy) translate; players' own names do not.
 
 ## 4. Visual and audio design
 
@@ -160,13 +160,10 @@ The pavilion (`native/render.ts`) is the browser build's three.js r160 scene on 
 
 **Quality.** The runtime's Options choose the graphics level (Auto from the device, render scale, frame-rate limit, adaptive resolution, the FPS readout); `native/quality.ts` maps its tier to the browser build's preset table and budgets:
 
+Shadows, ambient occlusion, bloom, grade and anti-aliasing come from the engine's `levelSettings()` for the level.
+
 | | Low | Balanced | High | Ultra |
 |---|---|---|---|---|
-| Shadows | off | 1024 | 2048 | 4096 |
-| Ambient occlusion | off | off | on (8 samples) | high (16) |
-| Bloom (0.42 / 0.4 / 0.92) | off | on | on | on |
-| Display grade + vignette | off | on | on | on |
-| Anti-aliasing | MSAA | FXAA | SMAA | MSAA |
 | Reflections, textures, sky dome, festoon | off | on | on | on |
 | Shading | Lambert | Standard | Physical (clear-coat) | Physical |
 | Wood / flagstone texture (tile ½) | 128 px | 256 px | 256 px | 512 px |
@@ -175,7 +172,7 @@ The pavilion (`native/render.ts`) is the browser build's three.js r160 scene on 
 
 The circuit, floats, die, hit areas and rules are identical on every tier. The old panel's per-effect overrides are not offered (the runtime's Options choose a level).
 
-**Sound** (`native/audio.ts`): the authored one-shots (`sfx/*.opus`) per event on the effects bus; the adaptive music (pad, seeded pentatonic pluck, kick and shaker, bell accents at 76 BPM in the moods title, calm and tense — themes with a tense mood play tense in matches) rendered once into clips a slice a frame and crossfaded over 1.4 s; the pavilion ambience (a low-passed noise wash breathing at 0.09 Hz with seeded wind-chime plinks) rendered into a 30 s loop on the music bus at the old ambience-to-music ratio. The runtime's Options own the volumes, mute and voice limit; pausing and a hidden window silence the loops.
+**Sound** (`native/audio.ts`): the authored one-shots (`sfx/*.opus`) per event on the effects bus; the adaptive music (pad, seeded pentatonic pluck, kick and shaker, bell accents at 76 BPM in the moods title, calm and tense — themes with a tense mood play tense in matches) rendered once into clips by the engine's offline audio context and crossfaded over 1.4 s; the pavilion ambience (a low-passed noise wash breathing at 0.09 Hz with seeded wind-chime plinks) rendered into a 30 s loop on the music bus at the old ambience-to-music ratio. The runtime's Options own the volumes, mute and voice limit; pausing and a hidden window silence the loops.
 
 ## 5. Technical architecture
 
@@ -186,7 +183,7 @@ The circuit, floats, die, hit areas and rules are identical on every tier. The o
 - `src/session.js`: one match: validated commands, undo, replay envelope, snapshots; an injected clock and `aiStep()` (one AI decision) so the client paces AI turns on fixed steps.
 - `src/save.js`: the progression document, `mergeSaves`, the browser build's wrapped cloud document (`readForeign`), the device snapshot.
 - `src/options.js`: the game's own options and the browser build's settings KV mapping.
-- `src/i18n.js`, `src/locales/*`, `src/shstrings.js`: the nine locales.
+- `assets/strings.json`: the nine locales; `src/i18n.js`: the pure modules' T().
 - `native/main.ts`: the controller (screen flow, turn flow, AI pacing, lessons, progression, replay, input, lifecycle); `native/screens.ts`: every screen and overlay on `starhermit:ui`; `native/render.ts`: the pavilion; `native/audio.ts`, `native/platform.ts`, `native/quality.ts`, `native/style.ts`, `native/i18n.ts`, `native/game.ts` (typed facade over `src/`).
 
 No module mutates rules state except through a validated command. Rendering reconciles from the rules snapshot; UI state and simulation state are separate so closing a drawer cannot affect a match.

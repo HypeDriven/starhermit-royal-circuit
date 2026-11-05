@@ -1,0 +1,69 @@
+# Tier bench: today's Daily Circuit played by the Enter key (from daily-land.play), 3D at full tilt.
+until 600 Daily Circuit
+frames 30
+click =Daily Circuit
+until 300 Expected duration
+frames 10
+click =Start
+until 600 Hint
+frames 120
+measure start
+key Enter 1
+frames 20
+key Enter 1
+frames 20
+key Enter 1
+frames 20
+key Enter 1
+frames 20
+key Enter 1
+frames 20
+key Enter 1
+frames 20
+key Enter 1
+frames 20
+key Enter 1
+frames 20
+key Enter 1
+frames 20
+key Enter 1
+frames 20
+key Enter 1
+frames 20
+key Enter 1
+frames 20
+key Enter 1
+frames 20
+key Enter 1
+frames 20
+key Enter 1
+frames 20
+key Enter 1
+frames 20
+key Enter 1
+frames 20
+key Enter 1
+frames 20
+key Enter 1
+frames 20
+key Enter 1
+frames 20
+key Enter 1
+frames 20
+key Enter 1
+frames 20
+key Enter 1
+frames 20
+key Enter 1
+frames 20
+key Enter 1
+frames 20
+key Enter 1
+frames 20
+key Enter 1
+frames 20
+key Enter 1
+frames 20
+key Enter 1
+frames 20
+measure stop

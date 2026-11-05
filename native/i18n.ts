@@ -1,56 +1,34 @@
-// Localization: the browser build's tables (src/i18n.js with src/locales/*,
-// English text as the keys, the nine StarHermit locales; the account strings
-// in src/shstrings.js) in the interface language the runtime reports
-// (preferences().language: the player's choice in Options › Language, else
-// the account's preferred language or the device's). The runtime's Options
-// replace the game's own Language setting (sh-language.js) and the DOM
-// re-labelling: every string is drawn through T() each frame, so a change
-// shows on the next frame and never restarts the match.
-import { onPreferencesChange, preferences } from "starhermit:engine";
+// Localization: the engine's string tables (assets/strings.json, English text
+// as the keys, the nine StarHermit locales; en-GB and fr-CA / es-ES fall back
+// through the engine's chain) in the interface language the runtime reports
+// (the player's choice in Options › Language, else the account's preferred
+// language or the device's). Every string is drawn through T() each frame, so
+// a change shows on the next frame and never restarts the match. The account
+// lines are the engine's own `starhermit.*` strings.
+import { strings } from "starhermit:engine";
 import * as ui from "starhermit:ui";
 import * as i18n from "../src/i18n.js";
-import * as sh from "../src/shstrings.js";
 
 export type Vars = Record<string, string | number>;
-const I = i18n as unknown as {
-  T(key: string, vars?: Vars): string; pname(name: string): string; setLocale(tag: string): void; getLang(): string; LOCALES: string[];
-};
-const SH = sh as unknown as { shText(key: string, vars?: Vars): string };
+const I = i18n as unknown as { fmt(s: string, vars?: Vars): string; setTranslator(has: (k: string) => boolean, t: (k: string, v?: Vars) => string): void; pname(name: string): string };
+strings.load("assets/strings.json");
+strings.defaultLocale = "en-US";
+ui.setLanguage(strings.locale);
+strings.onChange((locale) => ui.setLanguage(locale));
+I.setTranslator((k) => strings.has(k), (k, v) => strings.t(k, v));
 
-/** The nearest shipped locale for a BCP 47 tag (es-MX → es-419, en-AU → en-GB, pt-PT → pt-BR, fr-BE → fr-FR). */
-export function matchLocale(tag: string): string {
-  const t = String(tag || "en-US");
-  const L = I.LOCALES;
-  const exact = L.find((l) => l.toLowerCase() === t.toLowerCase());
-  if (exact) return exact;
-  const lang = t.split("-")[0]!.toLowerCase();
-  const region = (t.split("-")[1] || "").toUpperCase();
-  if (lang === "en") return ["US", "PR", "UM", "AS", "GU", "MP", "VI", ""].includes(region) ? "en-US" : "en-GB";
-  if (lang === "es") return region === "ES" ? "es-ES" : "es-419";
-  if (lang === "fr") return region === "CA" ? "fr-CA" : "fr-FR";
-  if (lang === "pt") return "pt-BR";
-  if (lang === "de") return "de-DE";
-  if (lang === "it") return "it-IT";
-  return "en-US";
+export function currentLocale(): string { return strings.locale; }
+/** An English source string in the player's language; unknown strings (player names) pass through; `{name}` placeholders from vars. */
+export function T(key: string, vars?: Vars | null): string {
+  return strings.has(key) ? strings.t(key, vars ?? undefined) : vars ? I.fmt(key, vars) : key;
 }
-
-let locale = "";
-function apply(tag: string): void {
-  const next = matchLocale(tag);
-  if (next === locale) return;
-  locale = next;
-  I.setLocale(next);
-  ui.setLanguage(next);
-}
-apply(preferences().language);
-onPreferencesChange((p) => apply(p.language));
-
-export function currentLocale(): string { return locale; }
-/** An English source string in the player's language; `{name}` placeholders from vars. */
-export function T(key: string, vars?: Vars | null): string { return I.T(key, vars ?? undefined); }
 /** Marks an English key that is translated with T() where it is shown. */
 export const N = (s: string): string => s;
 /** A player's display name: built-in names (AI rivals, seats, the guest) are translated. */
 export function pname(name: string): string { return I.pname(name); }
-/** The account strings (signIn, invite, inviteCopied, inviteLink, signedOut, lbPosting, lbRank, lbPosted, lbFailed). */
-export function S(key: string, vars?: Vars): string { return SH.shText(key, vars); }
+const ACCOUNT = {
+  signIn: "signIn", invite: "invite", inviteCopied: "inviteCopied", inviteLink: "inviteLink", signedOut: "signedOut",
+  lbPosting: "leaderboardPosting", lbRank: "leaderboardRank", lbPosted: "leaderboardPosted", lbFailed: "leaderboardNotPosted",
+} as const;
+/** An account line (the engine's) in the player's language. */
+export function S(key: keyof typeof ACCOUNT, vars?: Vars): string { return strings.t(`starhermit.${ACCOUNT[key]}`, vars); }

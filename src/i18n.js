@@ -1,40 +1,13 @@
-// Royal Circuit localization core.
-//
-// Every player-facing string is authored in US English and looked up by that
-// English text: T('Play') → the current locale's translation (en-US is the
-// key itself). Placeholders use {name}. N('…') marks a string for extraction
-// without translating it at that point (the caller translates at display time).
-//
-// The locale is the runtime's interface language (native/i18n.ts: the
-// player's choice in Options › Language, else the account's preferred
-// language or the device's), mapped to the nearest shipped locale.
+// Royal Circuit localization for the pure modules: every player-facing string
+// is authored in US English and looked up by that text. T('Play') is the
+// current locale's translation through the engine's strings, which the client
+// installs (native/i18n.ts); node tests get the English keys. Placeholders use
+// {name}. N('…') marks a string for extraction without translating it there.
 
-import EN_GB from './locales/en-GB.js';
-import { ES_419, ES_ES } from './locales/es.js';
-import DE_DE from './locales/de.js';
-import { FR_FR, FR_CA } from './locales/fr.js';
-import PT_BR from './locales/pt.js';
-import IT_IT from './locales/it.js';
-
-export const LOCALES = ['en-US', 'en-GB', 'es-419', 'es-ES', 'de-DE', 'fr-FR', 'fr-CA', 'pt-BR', 'it-IT'];
-
-/** Locale → { English key: translation }. en-US is the identity; en-GB lists spelling changes. */
-export const DICTS = {
-  'en-US': {},
-  'en-GB': EN_GB,
-  'es-419': ES_419,
-  'es-ES': { ...ES_419, ...ES_ES },
-  'de-DE': DE_DE,
-  'fr-FR': FR_FR,
-  'fr-CA': { ...FR_FR, ...FR_CA },
-  'pt-BR': PT_BR,
-  'it-IT': IT_IT,
-};
-
-let lang = 'en-US';
-let dict = DICTS[lang];
-const listeners = new Set();
-const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+let hasKey = () => false;
+let translate = (k) => k;
+/** The engine client's lookup. */
+export function setTranslator(has, t) { hasKey = has; translate = t; }
 
 export function fmt(s, vars) {
   return String(s).replace(/\{(\w+)\}/g, (m, k) => (vars && vars[k] != null ? String(vars[k]) : m));
@@ -44,8 +17,8 @@ export function fmt(s, vars) {
 export function T(key, vars) {
   if (key == null) return '';
   const s = String(key);
-  const out = has(dict, s) ? dict[s] : s;
-  return vars ? fmt(out, vars) : out;
+  if (hasKey(s)) return translate(s, vars);
+  return vars ? fmt(s, vars) : s;
 }
 
 /** Mark a string for extraction; translated later with T(). */
@@ -56,17 +29,5 @@ export function pname(name) {
   const s = String(name ?? '');
   const seat = /^Seat (\d+)$/.exec(s);
   if (seat) return T('Seat {n}', { n: seat[1] });
-  return has(dict, s) ? dict[s] : s;
-}
-
-export function getLang() { return lang; }
-
-export function onLanguage(fn) { listeners.add(fn); return () => listeners.delete(fn); }
-
-export function setLocale(next) {
-  const resolved = DICTS[next] ? next : 'en-US';
-  const changed = resolved !== lang;
-  lang = resolved;
-  dict = DICTS[lang];
-  if (changed) for (const fn of [...listeners]) { try { fn(lang); } catch (e) { console.error(e); } }
+  return T(s);
 }

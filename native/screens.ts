@@ -34,10 +34,8 @@ import {
 // ------------------------------------------------------------------ layout
 interface Layout { lw: number; lh: number; sc: number; wide: boolean; compact: boolean; phone: boolean; land: boolean }
 function layoutNow(): Layout {
-  const f = frame();
-  const sc = ui.preferences().scale;
-  const sa = f.safeArea;
-  const lw = Math.max(1, (f.width - sa.left - sa.right) / sc), lh = Math.max(1, (f.height - sa.top - sa.bottom) / sc);
+  const v = ui.viewport!();
+  const sc = v.scale, lw = Math.max(1, v.width), lh = Math.max(1, v.height);
   const land = lw > lh && lh <= 500;
   return { lw, lh, sc, wide: lw >= 1024 && !land, compact: lw < 1024 || land, phone: lw <= 700, land };
 }
@@ -82,20 +80,10 @@ function button(b: Btn): boolean {
 }
 /** Buttons at their own widths in rows that wrap at `width` (flex-wrap). */
 function flow(label: string, list: Btn[], width: number, gap = 10, justify: "start" | "center" | "end" = "start"): void {
-  const rows: Btn[][] = [[]];
-  let used = 0;
   const bw = (b: Btn): number => Math.min(width, b.width ?? buttonWidth(b.text, b.style ?? "btn"));
-  for (const b of list) {
-    const w = bw(b);
-    if (rows[rows.length - 1]!.length && used + gap + w > width) { rows.push([]); used = 0; }
-    used += (rows[rows.length - 1]!.length ? gap : 0) + w;
-    rows[rows.length - 1]!.push(b);
-  }
-  ui.column(label, () => {
-    rows.forEach((row, ri) => ui.row(`${label}-r${ri}`, () => {
-      for (const b of row) button({ ...b, width: bw(b) });
-    }, { spacing: gap, width, justify, align: "center" }));
-  }, { spacing: gap, width });
+  ui.row(label, () => {
+    for (const b of list) button(b.width != null || bw(b) >= width ? { ...b, width: bw(b) } : b);
+  }, { wrap: true, width, gap, justify, align: "center" });
 }
 /** A check box row (a role "checkbox" widget: built-in check box labels don't wrap). */
 function toggleRow(id: string, label: string, on: boolean, w: number, set: (v: boolean) => void): void {
@@ -106,7 +94,7 @@ function toggleRow(id: string, label: string, on: boolean, w: number, set: (v: b
         const s = st.scale, box = 22 * s, bx = r.x + (r.width - box) / 2, by = r.y + (r.height - box) / 2;
         draw.roundRect(bx, by, box, box, 4, on ? token("accent") : "#2a2342");
         draw.strokeRoundRect(bx, by, box, box, 4, on ? token("accent") : "#8a80a0", 2);
-        if (on) draw.text("✓", bx + box / 2, by + 1 * s, { size: 17 * s, color: token("ink"), align: "center", weight: "bold" });
+        if (on) draw.text("✓", bx + box / 2, by + 1 * s, { font: "StarHermit Emoji", size: 17 * s, color: token("ink"), align: "center", weight: "bold" });
       },
     });
     para(label, w - 56, "text", `${id}-label`);
