@@ -1,3 +1,4 @@
+import { withLanguageRender as __l10nRender } from "./l10n/menu.ts";
 // Royal Circuit on the StarHermit engine: the entry module (starhermit.txt
 // engine.entry), played natively by the StarHermit client and in browsers by
 // the engine's web runtime. The rules (src/rules.js), AI (src/ai.js),
@@ -957,7 +958,7 @@ onUpdate((dt) => {
   if (app.banner && app.banner.until < clockMs) app.banner = null;
   if (app.caption && app.caption.until < clockMs) app.caption = null;
 });
-onRender(() => {
+onRender(__l10nRender(() => {
   const wasPlaying = app.screen === "game" && !app.overlays.length;
   const f = frame();
   render.update(frameDt, f.width, f.height);
@@ -965,4 +966,8 @@ onRender(() => {
   for (const fn of pending.splice(0)) fn();
   pointerInput(wasPlaying);
   flushAnnouncements();
-});
+}));
+
+// localization-runtime:menu
+import { installLanguageMenu as __installLanguageMenu } from "./l10n/menu.ts";
+__installLanguageMenu(false);
