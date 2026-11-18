@@ -31,13 +31,9 @@
 //   playback, and with it every AI turn's pacing, is the same on every
 //   machine and in play scripts.
 import {
-  ACESFilmicToneMapping, AdditiveBlending, BackSide, BoxGeometry, BufferAttribute, BufferGeometry, CanvasTexture, CircleGeometry, Color,
-  ConeGeometry, CylinderGeometry, DirectionalLight, DoubleSide, Euler, Fog, Group, HemisphereLight, InstancedMesh, LineBasicMaterial,
-  LineSegments, Matrix4, Mesh, MeshBasicMaterial, MeshLambertMaterial, MeshPhysicalMaterial, MeshStandardMaterial, PerspectiveCamera,
-  PMREMGenerator, PointLight, ParticleEmitter, Points, PointsMaterial, Quaternion, Raycaster, RepeatWrapping, RingGeometry, RoomEnvironment, SRGBColorSpace,
-  ShaderMaterial, SphereGeometry, TorusGeometry, Vector2, Vector3, pointerToNdc, renderer, scene,
-  type Material, type Object3D, type OrthographicCamera, type Texture,
+  ACESFilmicToneMapping, AdditiveBlending, BackSide, BoxGeometry, BufferAttribute, BufferGeometry, CanvasTexture, CircleGeometry, Color, ConeGeometry, CylinderGeometry, DirectionalLight, DoubleSide, Euler, Fog, Group, HemisphereLight, InstancedMesh, LineBasicMaterial, LineSegments, Matrix4, Mesh, MeshBasicMaterial, MeshLambertMaterial, MeshPhysicalMaterial, MeshStandardMaterial, PerspectiveCamera, PMREMGenerator, PointLight, Points, PointsMaterial, Quaternion, Raycaster, RepeatWrapping, RingGeometry, RoomEnvironment, SRGBColorSpace, ShaderMaterial, SphereGeometry, TorusGeometry, Vector2, Vector3, pointerToNdc, renderer, scene, type Material, type Object3D, type OrthographicCamera, type Texture,
 } from "starhermit:scene";
+import { GPUParticleEmitter } from "starhermit:particles";
 import { OffscreenCanvas, type OffscreenCanvasRenderingContext2D } from "starhermit:canvas";
 import { Layout, Rules, type GameEvent, type Move, type State, type Theme } from "./game.ts";
 import { MOTE_MAX, moteCount, particleCap, type Look } from "./quality.ts";
@@ -272,7 +268,7 @@ let floatsRoot: Group | null = null;
 let die: Mesh | null = null;
 let hintRings: Mesh[] = [];
 /** Burst emitters by colour (an emitter's colour is read for its live particles too), made as bursts ask; rebuilt with the board. */
-const bursts = new Map<number, ParticleEmitter>();
+const bursts = new Map<number, GPUParticleEmitter>();
 let burstMat: PointsMaterial | null = null, burstLayer: Group | null = null, burstCap = 0;
 let motes: Points | null = null, mGeo: BufferGeometry | null = null;
 const mPos = new Float32Array(MOTE_MAX * 3);
@@ -688,7 +684,7 @@ function burst(pos: Pos, colorHex: number, n = 18, speed = 3.2): void {
   if (cap !== burstCap) { burstCap = cap; for (const e of bursts.values()) { burstLayer.remove(e); e.dispose(); } bursts.clear(); }
   let e = bursts.get(colorHex);
   if (!e) {
-    e = track(new ParticleEmitter({ capacity: Math.max(1, cap), material: burstMat, seed: colorHex + 1, space: "local", color: colorHex, life: [0.9, 1.4], gravity: [0, -7, 0] }));
+    e = track(new GPUParticleEmitter({ capacity: Math.max(1, cap), material: burstMat, seed: colorHex + 1, space: "local", color: colorHex, life: [0.9, 1.4], gravity: [0, -7, 0] }));
     e.frustumCulled = false;
     e.noAO = true;
     burstLayer.add(e);

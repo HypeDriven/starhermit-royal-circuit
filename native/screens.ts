@@ -132,7 +132,7 @@ function seg<T extends string | number>(id: string, label: string, options: read
 }
 
 // ------------------------------------------------------------------ the frame
-export function drawScreens(): void {
+function drawScreensImmediate(): void {
   const L = layoutNow();
   const f = frame();
   if (app.screen === "game") hud(L);
@@ -975,4 +975,11 @@ function confirmPanel(w: number): void {
     { id: "confirm-no", text: T("Cancel"), style: "btn-ghost", act: () => hideOverlay("confirm") },
     { id: "confirm-yes", text: T("Confirm"), style: "btn-danger", act: confirmYes },
   ], w, 10, "end");
+}
+
+export function drawScreens(): void {
+  if (!(topOverlay() === "help")) { drawScreensImmediate(); return; }
+  const actions = ["confirm","cancel","next","prev","undo","hint","pause","camera","board"];
+  const version = JSON.stringify([(app as any).settings ?? (app as any).options ?? {}, (platform as any).options ?? {}, actions.map((action) => bindings(action))]);
+  ui.retain!("help-screen", version, drawScreensImmediate);
 }

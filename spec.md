@@ -5,7 +5,7 @@
 **Genre:** Turn-based race board  
 **Players:** 2–4 players depending on ruleset, plus practice AI  
 **Targets:** the StarHermit client (native) and browsers through the engine's web runtime; desktop, phones and tablets, landscape and portrait  
-**Implementation:** a StarHermit engine script game (engine 1.39.0, `engine.minor=39`): `native/*.ts` over the pure rules, AI, content, session and save modules in `src/`; the pavilion on `starhermit:scene`, every screen on `starhermit:ui`
+**Implementation:** a StarHermit engine script game (engine 1.44.1, `engine.minor=44`): `native/*.ts` over the pure rules, AI, content, session and save modules in `src/`; the pavilion on `starhermit:scene`, every screen on `starhermit:ui`
 
 ## 1. Product vision
 
@@ -205,7 +205,7 @@ No module mutates rules state except through a validated command. Rendering reco
 ## 6. StarHermit integration
 
 ### Packaging and launch
-- `starhermit.txt`: name, description, owner, `server=score-script.js`, cover, `launch=index.html`, `engine.api=1`, `engine.entry=native/main.ts`, `engine.version=1.39.0`, `engine.minor=39`, `engine.capabilities=platform,storage,clipboard`, the `control.*` keys and `engine.gamepad.*` buttons with their groups.
+- `starhermit.txt`: name, description, owner, `server=score-script.js`, cover, `launch=index.html`, `engine.api=1`, `engine.entry=native/main.ts`, `engine.version=1.44.1`, `engine.minor=44`, `engine.capabilities=platform,storage,clipboard`, the `control.*` keys and `engine.gamepad.*` buttons with their groups.
 - `npm run package` (`starhermit package --web .`) writes the web loader `index.html` and `starhermit-files.json`; `.starhermitignore` leaves out tests, tools, docs, the dev server and documents.
 
 ### Identity, saves and settings
@@ -289,3 +289,11 @@ This document does **not** authorize implementation, asset production, monetizat
 The string tables include complete regional variants for `fr-BE`, `de-BE`, `en-SG`, `en-HK`, `en-BQ`, `es-CO`, `de-IT`, `fr-IT`, `es-CL`, `es-AR`, `es-EC`, `de-BR`. These reuse the corresponding existing translations in their language family. The runtime can resolve the exact regional tag. Language selection is available from the game’s Options panel or F2 and is saved per player in `ui.language`. Changes apply during play. Additional national, regional and indigenous language packs are only shipped once every English message has a translation with intact placeholders and markup. Complete additional language tables: `ja-JP`, `nl-BE`, `zh-SG`, `ms-SG`, `yue-HK`, `nl-NL`, `fi-FI`, `sv-FI`, `et-EE`, `id-ID`, `vi-VN`, `zh-HK`, `ta-SG`, `ru-FI`, `ru-EE`, `da-DE`, `lb-BE`, `co-FR`, `eu-FR`, `ca-FR`, `oc-FR`, `sl-IT`, `fur-IT`, `ca-IT`, `oc-IT`, `ca-ES`, `eu-ES`, `gl-ES`, `su-ID`, `bew-ID`, `km-VN`.
 
 <!-- regional-localization:end -->
+
+Cosmetic particle emitters use native GPU particles with automatic CPU fallback on devices or graphics tiers without GPU particle support.
+
+## Engine 1.44.1
+
+Browser play uses the WebGPU-only StarHermit 1.44.1 web runtime. Automatic ray-traced shadows are enabled on supported Vulkan devices, with mapped-shadow fallbacks elsewhere. Packaging creates block-compressed runtime textures and compressed glTF copies, retaining original image fallbacks.
+
+The help screen replays through retained native UI while its contents, options, layout and key bindings are unchanged.
