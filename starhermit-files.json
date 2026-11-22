@@ -17,7 +17,7 @@
     "cover.jpg": {"sha256": "419815cc64ac4e41d30169741107b115ee0b73079889c72d05960b725a6c1069", "size": 353246},
     "icon.png": {"sha256": "3fea4cd67a29d04961539be6e2c231ab7ec3a041b4d2e5ac79acaf031eaeb20b", "size": 11931},
     "icon.png.ktx2": {"sha256": "a63268266b9c60a2a9008a0bdc1ceacb9a50c30d1bc9df5e59c5f2f6b4ea7ae5", "size": 87776},
-    "index.html": {"sha256": "103015bae88296dbca4d3c30b0e3f69549da27a0bc197fbe991d42f9e146bda7", "size": 1782},
+    "index.html": {"sha256": "928e69664391092839ebec09302a44b9ea9a55dd5ad2d2f109128ef21224ae4a", "size": 1782},
     "native/audio.ts": {"sha256": "a2c58ae5f789bb41aa8dddb185065739878210244bef80c4cd560cafa4256581", "size": 13685},
     "native/game.ts": {"sha256": "bd969913972f04d63469d721b4473e622a54d1745171ef67c20c8decf856989c", "size": 8045},
     "native/i18n.ts": {"sha256": "d78018ffa1fdd8ae17c52a224f299d5901619310d2b1a727edf1d613fa703672", "size": 2213},
@@ -26,10 +26,10 @@
     "native/main.ts": {"sha256": "fdb9eb383a790fb828f838701f4a469270fa8de178af0473458d60ee6b8488dc", "size": 42811},
     "native/platform.ts": {"sha256": "6d9de8abb04478c74ce5bc04044dbc1805a0cb5439660defae7185dbf1d7c4ca", "size": 9920},
     "native/quality.ts": {"sha256": "5bb35fc318574bb8001c64d285d627f8835464f8bbbd462fa117f2d548422d42", "size": 4093},
-    "native/render.ts": {"sha256": "b6ed8d3286fd02a761dff8ca3b75bcd940459a55ac63096daf08aacfd003d683", "size": 47850},
+    "native/render.ts": {"sha256": "373fc2e9634af7c133c76373d74750d04abb500afbb3a3efe888d417b6419275", "size": 47981},
     "native/screens.ts": {"sha256": "5147531cbc5982d4ac84ed5fc976e65d72f07e5dc87a215dc48871c854436711", "size": 57902},
     "native/style.ts": {"sha256": "8414306563b22291127c35f0d363bfce3a7c18991611318b7f62d403e9c912a6", "size": 3120},
-    "publication.json": {"sha256": "0cc0a22be8da3f160396589901a73ff561c3d9e59acbf16e3a73e42fe1114975", "size": 3225},
+    "publication.json": {"sha256": "13da7c56e45e6d4ce49c86e2d65a25c59b5d41817d74eaa574c26b8d06d02d85", "size": 4141},
     "score-script.js": {"sha256": "2dbfcf68f98b1c687e6c9539fc400ce5cb22a6bf598881342b55383d22db8948", "size": 2486},
     "sfx/bell-arpeggio.opus": {"sha256": "2e0c0b7c840cc33e991e329908d689c4f46407aa97eb27788fc8758226758e91", "size": 27257},
     "sfx/breath-whoosh.opus": {"sha256": "31ccbf9357c227260acdb454a4c067c1fadff2fd75ff5a8887df38a3514d5917", "size": 12667},
@@ -56,7 +56,7 @@
     "src/rules.js": {"sha256": "7b1cb70978d1e1fdef360db5534b6f7643ea90b6c1b6a0e4b13b92ad4f2a236b", "size": 18916},
     "src/save.js": {"sha256": "aa105c35c4bad38b1ae3e3547699b98b747d8132fb94e27349496e3479859141", "size": 6823},
     "src/session.js": {"sha256": "db7ef08234a50f500e8f7ebd453a74845417152e8a59af0ac0e60a6bb89ea291", "size": 10642},
-    "starhermit.txt": {"sha256": "973bf8293f8095e968f31b7589077bc2db4310c243eeac35b633002e4f4eaabc", "size": 1365}
+    "starhermit.txt": {"sha256": "c963a25f10de95eb406c1942966e55e52f9e663f9f5ea4279fb408f685dabd31", "size": 1388}
   },
   "excluded": ["LICENSE.md", "coverart.png", "docs/", "knownissues.md", "node_modules/", "package-lock.json", "package.json", "server.js", "sfx/manifest.json", "sfx/manifest.md", "spec.md", "tests/", "tools/", "tsconfig.json"],
   "format": 1
