@@ -12,7 +12,7 @@
     "metadataSource": "starhermit.txt",
     "createdAt": "2026-09-01T07:01:06.972628+00:00",
     "coverArtSource": "manifest",
-    "coverArtUpdatedAt": "2026-11-26T22:13:26.189253+00:00",
+    "coverArtUpdatedAt": "2026-11-27T17:07:34.310811+00:00",
     "submittedByUserId": "2712e04e-461b-4d23-81ae-e40b429128a8",
     "submittedByUsername": "starhermit",
     "hosting": {
@@ -22,9 +22,9 @@
       "pinnedCommitSha": null,
       "deployedCommitSha": null,
       "deployError": null,
-      "deployedAt": "2026-11-26T22:13:26.178519+00:00",
+      "deployedAt": "2026-11-27T17:07:34.301086+00:00",
       "externalLaunchUrl": null,
-      "engineVersion": "1.51.0",
+      "engineVersion": "1.53.0",
       "deployWarning": null
     },
     "description": "Roll dice and race four tokens around a shared track, using captures and safe spaces to reach home first.",
@@ -36,19 +36,19 @@
     "links": [],
     "isDisabled": false
   },
-  "publishedAt": "2026-11-26T22:13:26.561Z",
-  "sourceCommit": "291c75cdc45bfc5a9d4de3754b12651be4c451b2",
-  "bytesReceived": 2154328,
-  "archiveSha256": "c78c3b938b362bd3e44b07144b022dcb583701a770f6ba468612fea9ad85ff9b",
+  "publishedAt": "2026-11-27T17:07:34.475Z",
+  "sourceCommit": "ceb3c0f877775dca52047a1e1c5cc9eecdba9510",
+  "bytesReceived": 2154279,
+  "archiveSha256": "e36e254e175ea7516bf2568a4febbc4b1534f45b94575468a06c7b4b5a0cbbe5",
   "indexSha256": "e44bfef0bed28a14f262f74331e06d59ed4cdb8ee11663f6eb15c3527d73ac87",
   "result": {
     "clientPublished": true,
     "serverImageLoaded": false,
     "imageDigest": null,
-    "bytesReceived": 2154328,
+    "bytesReceived": 2154279,
     "mode": "replace",
     "filesRemoved": 0,
-    "engineVersion": "1.51.0",
+    "engineVersion": "1.53.0",
     "deployWarning": null
   },
   "liveVerification": {
