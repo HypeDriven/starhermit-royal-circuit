@@ -38,17 +38,11 @@ export const EVENT_CAPTIONS: Record<string, string> = {
 const clips = new Map<string, AudioClip>();
 let suspended = false;
 
-/** Loads every clip at once and starts the renders (onStart). */
+/** Loads every clip at once (onStart). The moods render on the first update, the title's first. */
 export function loadSfx(): void {
   for (const name of new Set(Object.values(EVENT_SAMPLES))) {
     loadClip(`sfx/${name}.opus`).then((c) => { clips.set(name, c); }, (e: unknown) => console.warn(`sfx ${name}: ${e instanceof Error ? e.message : String(e)}`));
   }
-  void (async () => { // one mood at a time: the title's first, as it plays first
-    for (const m of ["title", "calm", "tense"] as Mood[]) {
-      try { moodClips[m] = await renderMood(m); } catch (e) { console.warn(`audio: ${String(e)}`); }
-    }
-  })();
-  renderAmbience().then((c) => { ambClip = c; }, (e: unknown) => console.warn(`audio: ${String(e)}`));
 }
 /** audio.js event(): the event's clip on the effects bus. */
 export function event(name: string): void {
@@ -239,7 +233,21 @@ export function setSuspended(on: boolean): void {
 }
 
 /** Each frame once the mixer runs: follow the mood, then the ambience. */
+let __bedsStarted = false;
+function startBeds(): void {
+  if (__bedsStarted) return;
+  __bedsStarted = true;
+  void (async () => {
+    renderAmbience().then((c) => { ambClip = c; }, (e: unknown) => console.warn(`audio: ${String(e)}`));
+    // one mood at a time: the title's first, as it plays first
+    for (const m of ["title", "calm", "tense"] as Mood[]) {
+      try { moodClips[m] = await renderMood(m); } catch (e) { console.warn(`audio: ${String(e)}`); }
+    }
+  })();
+}
+
 export function update(): void {
+  startBeds();
   if (context.state !== "running") return;
   if (mood !== "off" && moodVoice?.mood !== mood && moodClips[mood]) {
     try {
